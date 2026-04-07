@@ -4,6 +4,7 @@ import {
   canEditTask,
   canDeleteTask,
   isActiveColumn,
+  isManualColumn,
   clearFailureOnReopen,
 } from './task'
 import type { Task } from '../shared/types'
@@ -42,6 +43,21 @@ test('canManuallyMove rejects transitions out of active columns', () => {
   expect(canManuallyMove('ai_review_in_progress', 'ai_review')).toBe(false)
 })
 
+test('canManuallyMove rejects self-moves (same column)', () => {
+  expect(canManuallyMove('todo', 'todo')).toBe(false)
+  expect(canManuallyMove('backlog', 'backlog')).toBe(false)
+})
+
+test('isManualColumn identifies the five manual columns', () => {
+  expect(isManualColumn('backlog')).toBe(true)
+  expect(isManualColumn('todo')).toBe(true)
+  expect(isManualColumn('ai_review')).toBe(true)
+  expect(isManualColumn('human_review')).toBe(true)
+  expect(isManualColumn('done')).toBe(true)
+  expect(isManualColumn('progress')).toBe(false)
+  expect(isManualColumn('ai_review_in_progress')).toBe(false)
+})
+
 test('canEditTask returns false for tasks in active columns', () => {
   expect(canEditTask(makeTask({ column: 'progress' }))).toBe(false)
   expect(canEditTask(makeTask({ column: 'ai_review_in_progress' }))).toBe(false)
@@ -68,6 +84,18 @@ test('clearFailureOnReopen resets attempts and failure reason when moving from h
   })
   const patch = clearFailureOnReopen(task, 'todo')
   expect(patch).toEqual({ attemptsCount: 0, lastFailureReason: null })
+})
+
+test('clearFailureOnReopen also clears on human_review to backlog', () => {
+  const task = makeTask({
+    column: 'human_review',
+    attemptsCount: 2,
+    lastFailureReason: 'timeout',
+  })
+  expect(clearFailureOnReopen(task, 'backlog')).toEqual({
+    attemptsCount: 0,
+    lastFailureReason: null,
+  })
 })
 
 test('clearFailureOnReopen returns empty patch for non-reopening moves', () => {
