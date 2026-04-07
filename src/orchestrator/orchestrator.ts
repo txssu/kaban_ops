@@ -240,12 +240,6 @@ export class Orchestrator {
         signal: controller.signal,
       })
 
-      if (controller.signal.aborted) {
-        const reason = controller.signal.reason === 'timeout' ? 'timeout' : 'aborted'
-        this.handleFailure(taskId, runId, reason)
-        return
-      }
-
       this.deps.db
         .update(runs)
         .set({
@@ -280,7 +274,7 @@ export class Orchestrator {
           .where(eq(runs.id, runId))
           .run()
       }
-      this.handleFailure(taskId, runId, reason)
+      this.moveToHumanReview(taskId, reason)
     }
   }
 
@@ -408,15 +402,11 @@ export class Orchestrator {
           .where(eq(runs.id, runId))
           .run()
       }
-      this.handleFailure(taskId, runId, reason)
+      this.moveToHumanReview(taskId, reason)
     }
   }
 
-  private handleFailure(
-    taskId: number,
-    _runId: number | null,
-    reason: FailureReason,
-  ): void {
+  private moveToHumanReview(taskId: number, reason: FailureReason): void {
     const nextPos = this.nextPosition('human_review')
     this.deps.db
       .update(tasks)
