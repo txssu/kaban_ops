@@ -4,14 +4,14 @@ import { createApp } from './server/app'
 import { SseBus } from './server/sse-bus'
 import { BunGitClient } from './orchestrator/git-client'
 import { Orchestrator } from './orchestrator/orchestrator'
-import { FakeAIRunner } from './orchestrator/runner'
+import { ClaudeAgentRunner } from './orchestrator/claude-agent-runner'
 import { loadConfig } from './shared/config'
 import { paths } from './shared/paths'
 
 const db = createDb()
 const bus = new SseBus()
 const git = new BunGitClient(paths.reposDir, paths.worktreesDir)
-const runner = new FakeAIRunner() // replaced with ClaudeCodeRunner in Task 21
+const runner = new ClaudeAgentRunner()
 const config = loadConfig(paths.configFile)
 const orchestrator = new Orchestrator({ db, runner, git, bus, config })
 orchestrator.recoverFromCrash()
