@@ -1,106 +1,105 @@
+# Kaban Ops — project notes
 
-Default to using Bun instead of Node.js.
+Local AI orchestrator with a kanban UI. One Bun process runs everything:
+Hono HTTP API, the React frontend (via Bun HTML imports), the orchestrator
+tick loop, and SQLite.
 
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun test` instead of `jest` or `vitest`
-- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
-- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
-- Use `bunx <package> <command>` instead of `npx <package> <command>`
-- Bun automatically loads .env, so don't use dotenv.
+## Run
 
-## APIs
+- `bun src/index.ts` — start server on http://localhost:3000
+- `bun test` — full suite (50 tests, ~600ms)
+- `bunx tsc --noEmit` — typecheck
+- `bun scripts/seed-dev.ts` — seed `.data/kaban.db` with a fake repo and
+  tasks for browser testing (`scripts/` is in `.git/info/exclude`)
 
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
+## State on disk
 
-## Testing
+Everything mutable lives in `.data/` (gitignored):
 
-Use `bun test` to run tests.
+- `.data/kaban.db` — SQLite, Drizzle schema in `src/db/schema.ts`
+- `.data/repos/<name>/` — git clones added through the UI
+- `.data/worktrees/task-<id>/` — per-task worktrees on `kaban/task-<id>` branches
+- `.data/config.json` — `{ progressLimit, aiReviewLimit, maxAttempts, taskTimeoutMs }`
 
-```ts#index.test.ts
-import { test, expect } from "bun:test";
+## Stack
 
-test("hello world", () => {
-  expect(1).toBe(1);
-});
+Bun, Hono, React 19, Tailwind v4, shadcn/ui, TanStack Query, dnd-kit,
+SQLite via `bun:sqlite`, Drizzle ORM, `Bun.$` for git, and
+`@anthropic-ai/claude-agent-sdk` (`query()` directly, no Vercel AI SDK).
+
+## Folder structure
+
+```
+src/
+  index.ts             # entry: boots Bun.serve + orchestrator
+  index.html           # loaded by Bun HTML imports
+  shared/              # paths, config, types (cross-cutting, no deps)
+  db/                  # schema, client, in-memory test helper
+  domain/              # pure transition rules
+  orchestrator/        # tick loop, runners, git client, prompts
+  server/              # Hono app, routes, SSE bus
+  frontend/
+    main.tsx           # React root
+    index.css          # imported from main.tsx (NOT via <link>)
+    api.ts             # typed fetch wrappers
+    hooks/             # TanStack Query hooks + SSE subscription
+    components/        # board, column, card, dialogs
+    components/ui/     # shadcn (generated)
+    lib/utils.ts       # cn() helper
+tests/helpers/         # makeDb, createTempRepoPair
 ```
 
-## Frontend
+## Conventions and gotchas
 
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
+**TypeScript strict + `verbatimModuleSyntax: true`.** Split runtime and
+type-only imports: `import { foo }` for values, `import type { Bar }` for
+types. `paths` mapping uses `@/*` → `src/frontend/*` (no `baseUrl` —
+deprecated in TS 7). shadcn-generated files use the `@/*` alias; the rest
+of the source uses relative imports.
 
-Server:
+**Tailwind v4 needs `bun-plugin-tailwind`.** Registered in `bunfig.toml`
+as `[serve.static] plugins = ["bun-plugin-tailwind"]`. CSS must be
+imported from JavaScript (`import './index.css'` in `main.tsx`), NOT via
+`<link rel="stylesheet">` in `index.html` — Bun's HTML loader bypasses
+the bundler plugin chain for `<link>` tags, so utility classes don't get
+generated.
 
-```ts#index.ts
-import index from "./index.html"
+**shadcn `Card` does not forwardRef.** When using dnd-kit with a card,
+wrap `<Card>` in a plain `<div ref={setNodeRef} {...listeners}>` and put
+the transform/listeners on the div, not the Card.
 
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
-```
+**Drizzle `extraConfig` uses the array form.** `(t) => [index(...).on(...)]`,
+not the deprecated object form `(t) => ({ name: index(...) })`.
 
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
+**Atomic queue pull.** `Orchestrator.pullNext()` wraps SELECT + UPDATE in
+`db.transaction(...)` and the UPDATE includes a `column = from` guard.
 
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
+**Agent SDK call shape.** `ClaudeAgentRunner` calls
+`query({ prompt, options: { cwd, abortController, permissionMode:
+'bypassPermissions', systemPrompt: { type: 'preset', preset: 'claude_code' },
+settingSources: ['user', 'project', 'local'] } })`. The reviewer asks for
+a fenced JSON block at the end of its response and parses it with Zod —
+there is no native `generateObject` in the Agent SDK.
 
-With the following `frontend.tsx`:
+**Abort signal bridging.** The runner creates a fresh `AbortController`
+and forwards `input.signal` into it via an event listener cleaned up in
+`finally`.
 
-```tsx#frontend.tsx
-import React from "react";
-import { createRoot } from "react-dom/client";
+## Test strategy
 
-// import .css files directly and it works
-import './index.css';
+TDD. Real SQLite (`:memory:`) for DB tests, real git in temporary
+bare+clone pairs for git client tests, `FakeAIRunner` only for the
+orchestrator. No mocking of internal layers. No automated tests for
+React components — the frontend is verified via Playwright smoke tests
+during development.
 
-const root = createRoot(document.body);
+## Things to avoid
 
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
-
-root.render(<Frontend />);
-```
-
-Then, run index.ts
-
-```sh
-bun --hot ./index.ts
-```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+- Don't add `ai` (Vercel AI SDK) or `ai-sdk-provider-claude-code` back.
+  They were removed because of a version mismatch and the abstraction
+  isn't needed.
+- Don't put `<link rel="stylesheet">` in `index.html` (see Tailwind
+  note).
+- Don't `forwardRef` shadcn `Card` directly — wrap it in a div instead.
+- Don't put per-developer ignores in `.gitignore` — they go in
+  `.git/info/exclude`.
