@@ -4,6 +4,7 @@ import type { SseBus } from './sse-bus'
 import type { GitClient } from '../orchestrator/git-client'
 import { createRepositoryRoutes } from './routes/repositories'
 import { createTaskRoutes } from './routes/tasks'
+import { createEventRoutes } from './routes/events'
 
 export interface AppDeps {
   db: Db
@@ -17,6 +18,7 @@ export function createApp(deps: AppDeps) {
 
   app.route('/api/repositories', createRepositoryRoutes(deps))
   app.route('/api/tasks', createTaskRoutes(deps))
+  app.route('/api/events', createEventRoutes(deps))
 
   return app
 }
