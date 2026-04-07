@@ -27,9 +27,7 @@ export const tasks = sqliteTable(
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
-  (t) => ({
-    byColumn: index('tasks_by_column').on(t.column, t.position),
-  }),
+  (t) => [index('tasks_by_column').on(t.column, t.position)],
 )
 
 export const runs = sqliteTable(
@@ -47,7 +45,5 @@ export const runs = sqliteTable(
     startedAt: integer('started_at').notNull(),
     endedAt: integer('ended_at'),
   },
-  (t) => ({
-    byTask: index('runs_by_task').on(t.taskId, t.startedAt),
-  }),
+  (t) => [index('runs_by_task').on(t.taskId, t.startedAt)],
 )
