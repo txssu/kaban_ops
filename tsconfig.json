@@ -24,6 +24,13 @@
     // Some stricter flags (disabled by default)
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false
+    "noPropertyAccessFromIndexSignature": false,
+
+    // Path aliases for shadcn/ui generated components
+    "baseUrl": ".",
+    "paths": {
+      "src/frontend/lib/utils": ["src/frontend/lib/utils.ts"],
+      "src/frontend/components/ui/*": ["src/frontend/components/ui/*"]
+    }
   }
 }
