@@ -158,7 +158,7 @@ export function TaskDialog({
             <div className="border-t border-slate-200 dark:border-slate-800 pt-3 space-y-2">
               <h4 className="text-sm font-semibold">Last run</h4>
               <div className="text-xs text-slate-500 dark:text-slate-400 uppercase">Executor</div>
-              <pre className="whitespace-pre-wrap text-sm">
+              <pre className="whitespace-pre-wrap text-sm max-h-60 overflow-y-auto rounded bg-slate-50 p-2 dark:bg-slate-900">
                 {latestExecutor.summary ?? '(no summary)'}
               </pre>
               {latestReviewer && (
@@ -166,7 +166,7 @@ export function TaskDialog({
                   <div className="text-xs text-slate-500 dark:text-slate-400 uppercase">
                     Reviewer — {latestReviewer.verdict ?? 'unknown'}
                   </div>
-                  <pre className="whitespace-pre-wrap text-sm">
+                  <pre className="whitespace-pre-wrap text-sm max-h-60 overflow-y-auto rounded bg-slate-50 p-2 dark:bg-slate-900">
                     {latestReviewer.summary ?? '(no summary)'}
                   </pre>
                 </>
