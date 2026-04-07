@@ -1,9 +1,12 @@
 import { useCallback, useSyncExternalStore } from 'react'
 
-type Theme = 'light' | 'dark'
+type ThemePreference = 'light' | 'dark' | 'system'
 
-function getTheme(): Theme {
-  return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+let preference: ThemePreference =
+  (localStorage.getItem('theme') as ThemePreference) || 'system'
+
+function getPreference(): ThemePreference {
+  return preference
 }
 
 const listeners = new Set<() => void>()
@@ -13,20 +16,45 @@ function subscribe(cb: () => void) {
   return () => listeners.delete(cb)
 }
 
-function setTheme(theme: Theme) {
-  if (theme === 'dark') {
-    document.documentElement.classList.add('dark')
+function applyTheme(pref: ThemePreference) {
+  const isDark =
+    pref === 'dark' ||
+    (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
+  document.documentElement.classList.toggle('dark', isDark)
+}
+
+function setPreference(pref: ThemePreference) {
+  preference = pref
+  applyTheme(pref)
+  if (pref === 'system') {
+    localStorage.removeItem('theme')
   } else {
-    document.documentElement.classList.remove('dark')
+    localStorage.setItem('theme', pref)
   }
-  localStorage.setItem('theme', theme)
   for (const cb of listeners) cb()
 }
 
+// Re-apply when OS preference changes and user is on "system"
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if (preference === 'system') {
+    applyTheme('system')
+    for (const cb of listeners) cb()
+  }
+})
+
+const cycle: Record<ThemePreference, ThemePreference> = {
+  system: 'light',
+  light: 'dark',
+  dark: 'system',
+}
+
 export function useTheme() {
-  const theme = useSyncExternalStore(subscribe, getTheme)
+  const pref = useSyncExternalStore(subscribe, getPreference)
+  const resolved = document.documentElement.classList.contains('dark')
+    ? 'dark'
+    : 'light'
   const toggle = useCallback(() => {
-    setTheme(theme === 'dark' ? 'light' : 'dark')
-  }, [theme])
-  return { theme, toggle }
+    setPreference(cycle[pref])
+  }, [pref])
+  return { preference: pref, resolved, toggle }
 }
