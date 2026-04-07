@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -45,6 +46,10 @@ export function RepositoryDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Add repository</DialogTitle>
+          <DialogDescription>
+            Clone a git repository so tasks can target it. The clone is stored
+            locally inside the app's data directory.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div>

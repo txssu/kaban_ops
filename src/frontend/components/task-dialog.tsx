@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -106,6 +107,11 @@ export function TaskDialog({
           <DialogTitle>
             {mode === 'create' ? 'New task' : 'Task details'}
           </DialogTitle>
+          <DialogDescription>
+            {mode === 'create'
+              ? 'Add a new task to the backlog.'
+              : 'View task details, including the latest agent run summary.'}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
