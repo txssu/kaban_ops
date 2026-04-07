@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
+import { useDraggable } from '@dnd-kit/core'
+import { CSS } from '@dnd-kit/utilities'
 import { Card, CardContent } from './ui/card'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { StopCircle } from 'lucide-react'
 import { useStopTask } from '../hooks/use-tasks'
 import { useRepositories } from '../hooks/use-repositories'
-import { ACTIVE_COLUMNS } from '../../shared/types'
+import { ACTIVE_COLUMNS, MANUAL_COLUMNS } from '../../shared/types'
 import type { TaskWithRun } from '../../shared/types'
 
 function formatDuration(ms: number): string {
@@ -26,10 +28,23 @@ export function TaskCard({ task, onOpen, maxAttempts }: TaskCardProps) {
   const repositories = useRepositories().data ?? []
   const repo = repositories.find((r) => r.id === task.repositoryId)
   const isActive = (ACTIVE_COLUMNS as readonly string[]).includes(task.column)
+  const isDraggable = (MANUAL_COLUMNS as readonly string[]).includes(
+    task.column,
+  )
+
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({
+      id: task.id,
+      disabled: !isDraggable,
+    })
 
   return (
     <Card
-      className="mb-2 cursor-pointer"
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      className={`mb-2 cursor-pointer ${isDragging ? 'opacity-50' : ''}`}
+      style={{ transform: CSS.Translate.toString(transform) }}
       onClick={() => onOpen(task)}
       data-testid={`task-card-${task.id}`}
     >

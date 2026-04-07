@@ -1,4 +1,6 @@
+import { useDroppable } from '@dnd-kit/core'
 import type { TaskColumn, TaskWithRun } from '../../shared/types'
+import { MANUAL_COLUMNS } from '../../shared/types'
 import { TaskCard } from './task-card'
 
 const LABELS: Record<TaskColumn, string> = {
@@ -26,9 +28,18 @@ export function Column({
   onOpenTask,
   maxAttempts,
 }: ColumnProps) {
+  const isManual = (MANUAL_COLUMNS as readonly string[]).includes(column)
+  const { setNodeRef, isOver } = useDroppable({
+    id: column,
+    disabled: !isManual,
+  })
+
   return (
     <div
-      className="flex flex-col min-w-[280px] max-w-[280px] bg-slate-100 rounded-lg p-3"
+      ref={setNodeRef}
+      className={`flex flex-col min-w-[280px] max-w-[280px] rounded-lg p-3 ${
+        isOver ? 'bg-slate-200' : 'bg-slate-100'
+      }`}
       data-testid={`column-${column}`}
     >
       <div className="flex items-center justify-between mb-3">
