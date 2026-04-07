@@ -93,7 +93,7 @@ function LiveTimer({ startedAt }: { startedAt: number | null }) {
   }, [startedAt])
   if (startedAt === null) return null
   return (
-    <span className="text-xs text-slate-500 tabular-nums">
+    <span className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
       {formatDuration(now - startedAt)}
     </span>
   )

@@ -155,15 +155,15 @@ export function TaskDialog({
           </div>
 
           {latestExecutor && (
-            <div className="border-t pt-3 space-y-2">
+            <div className="border-t border-slate-200 dark:border-slate-800 pt-3 space-y-2">
               <h4 className="text-sm font-semibold">Last run</h4>
-              <div className="text-xs text-slate-500 uppercase">Executor</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 uppercase">Executor</div>
               <pre className="whitespace-pre-wrap text-sm">
                 {latestExecutor.summary ?? '(no summary)'}
               </pre>
               {latestReviewer && (
                 <>
-                  <div className="text-xs text-slate-500 uppercase">
+                  <div className="text-xs text-slate-500 dark:text-slate-400 uppercase">
                     Reviewer — {latestReviewer.verdict ?? 'unknown'}
                   </div>
                   <pre className="whitespace-pre-wrap text-sm">
