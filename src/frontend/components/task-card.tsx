@@ -39,15 +39,17 @@ export function TaskCard({ task, onOpen, maxAttempts }: TaskCardProps) {
     })
 
   return (
-    <Card
+    <div
       ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform) }}
       {...attributes}
       {...listeners}
-      className={`mb-2 cursor-pointer ${isDragging ? 'opacity-50' : ''}`}
-      style={{ transform: CSS.Translate.toString(transform) }}
-      onClick={() => onOpen(task)}
-      data-testid={`task-card-${task.id}`}
     >
+      <Card
+        className={`mb-2 cursor-pointer ${isDragging ? 'opacity-50' : ''}`}
+        onClick={() => onOpen(task)}
+        data-testid={`task-card-${task.id}`}
+      >
       <CardContent className="p-3 space-y-2">
         <div className="font-medium text-sm">{task.title}</div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -77,7 +79,8 @@ export function TaskCard({ task, onOpen, maxAttempts }: TaskCardProps) {
           </div>
         )}
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   )
 }
 
