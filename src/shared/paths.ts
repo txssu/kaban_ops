@@ -1,18 +1,21 @@
 import { join, resolve } from 'node:path'
 
 const PROJECT_ROOT = resolve(import.meta.dir, '..', '..')
+const DATA_DIR = join(PROJECT_ROOT, '.data')
+const REPOS_DIR = join(DATA_DIR, 'repos')
+const WORKTREES_DIR = join(DATA_DIR, 'worktrees')
 
 export const paths = {
   projectRoot: PROJECT_ROOT,
-  dataDir: join(PROJECT_ROOT, '.data'),
-  dbFile: join(PROJECT_ROOT, '.data', 'kaban.db'),
-  reposDir: join(PROJECT_ROOT, '.data', 'repos'),
-  worktreesDir: join(PROJECT_ROOT, '.data', 'worktrees'),
-  configFile: join(PROJECT_ROOT, '.data', 'config.json'),
+  dataDir: DATA_DIR,
+  dbFile: join(DATA_DIR, 'kaban.db'),
+  reposDir: REPOS_DIR,
+  worktreesDir: WORKTREES_DIR,
+  configFile: join(DATA_DIR, 'config.json'),
   repoDir(name: string): string {
-    return join(this.reposDir, name)
+    return join(REPOS_DIR, name)
   },
   worktreeDir(taskId: number): string {
-    return join(this.worktreesDir, `task-${taskId}`)
+    return join(WORKTREES_DIR, `task-${taskId}`)
   },
 }

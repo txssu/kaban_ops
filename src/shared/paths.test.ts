@@ -13,3 +13,9 @@ test('paths.repoDir composes under reposDir', () => {
 test('paths.worktreeDir uses task-<id>', () => {
   expect(paths.worktreeDir(42)).toBe(`${paths.worktreesDir}/task-42`)
 })
+
+test('destructured repoDir and worktreeDir still work without the object context', () => {
+  const { repoDir, worktreeDir } = paths
+  expect(repoDir('bar')).toBe(`${paths.reposDir}/bar`)
+  expect(worktreeDir(7)).toBe(`${paths.worktreesDir}/task-7`)
+})
