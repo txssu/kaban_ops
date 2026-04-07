@@ -2,6 +2,9 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
+import { KanbanBoard } from './components/kanban-board'
+import { Header } from './components/header'
+import { useTaskEvents } from './hooks/use-task-events'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -13,11 +16,12 @@ const queryClient = new QueryClient({
 })
 
 function App() {
+  useTaskEvents()
   return (
-    <main className="min-h-screen p-4">
-      <h1 className="text-2xl font-semibold">Kaban Ops</h1>
-      <p className="text-slate-500">Placeholder — board UI comes next.</p>
-    </main>
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <KanbanBoard />
+    </div>
   )
 }
 
