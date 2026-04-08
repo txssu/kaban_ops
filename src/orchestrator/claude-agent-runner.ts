@@ -39,11 +39,19 @@ export class ClaudeAgentRunner implements AIRunner {
       input,
     )
 
-    const match = finalText.match(/```json\s*\n([\s\S]*?)\n```/)
+    // Tolerant of a missing trailing newline before the closing fence.
+    const match = finalText.match(/```json\s*\n([\s\S]*?)\s*```/)
     if (!match || !match[1]) {
       throw new Error('reviewer did not return a JSON code block')
     }
-    const parsed = JSON.parse(match[1])
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(match[1])
+    } catch (err) {
+      throw new Error(
+        `reviewer JSON block did not parse: ${(err as Error).message}`,
+      )
+    }
     return reviewerSchema.parse(parsed)
   }
 

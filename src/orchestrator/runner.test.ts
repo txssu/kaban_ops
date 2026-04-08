@@ -45,3 +45,15 @@ test('FakeAIRunner throws when the queue is empty', async () => {
     }),
   ).rejects.toThrow('no queued executor result')
 })
+
+test('reviewer JSON matcher tolerates a missing trailing newline before the closing fence', () => {
+  // The fenced-JSON regex must match both shapes — with and without
+  // a trailing newline before the closing ```
+  const withNewline =
+    'some prose\n```json\n{"verdict":"approved","summary":"ok"}\n```'
+  const withoutNewline =
+    'some prose\n```json\n{"verdict":"approved","summary":"ok"}```'
+  const pattern = /```json\s*\n([\s\S]*?)\s*```/
+  expect(pattern.test(withNewline)).toBe(true)
+  expect(pattern.test(withoutNewline)).toBe(true)
+})
