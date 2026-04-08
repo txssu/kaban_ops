@@ -61,13 +61,18 @@ export class ClaudeAgentRunner implements AIRunner {
     }
 
     try {
+      // Permission flags resolved by Task A4 research (Agent SDK v0.2.92):
+      // Both flags are declared in the SDK options type. The SDK docs note that
+      // `allowDangerouslySkipPermissions` is a required companion to
+      // `permissionMode: 'bypassPermissions'` (a safety acknowledgement, not a
+      // duplicate). Per decision rule 3 we keep only the canonical named-mode
+      // enum and drop the boolean — `permissionMode` is the primary control.
       const q = query({
         prompt,
         options: {
           cwd: input.cwd,
           abortController: controller,
           permissionMode: 'bypassPermissions',
-          allowDangerouslySkipPermissions: true,
           systemPrompt: { type: 'preset', preset: 'claude_code' },
           settingSources: ['user', 'project', 'local'],
         },
