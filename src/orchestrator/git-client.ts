@@ -1,5 +1,5 @@
 import { $ } from 'bun'
-import { join } from 'node:path'
+import { join, resolve, sep } from 'node:path'
 import { mkdirSync } from 'node:fs'
 
 export interface RepositoryInfo {
@@ -39,7 +39,13 @@ export class BunGitClient implements GitClient {
     url: string
   }): Promise<RepositoryInfo> {
     mkdirSync(this.reposDir, { recursive: true })
-    const localPath = join(this.reposDir, input.name)
+    const localPath = resolve(join(this.reposDir, input.name))
+    const reposRoot = resolve(this.reposDir)
+    if (!localPath.startsWith(reposRoot + sep) && localPath !== reposRoot) {
+      throw new Error(
+        `resolved clone path must be inside ${reposRoot}, got ${localPath}`,
+      )
+    }
     await $`git clone ${input.url} ${localPath}`.quiet()
     const defaultBranch = await this.detectDefaultBranch(localPath)
     return { name: input.name, localPath, defaultBranch }

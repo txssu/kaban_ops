@@ -100,3 +100,20 @@ test('removeWorktree deletes the worktree directory and branch', async () => {
     pair.cleanup()
   }
 })
+
+test('cloneRepository rejects a name that escapes reposDir', async () => {
+  const reposDir = mkdtempSync(join(tmpdir(), 'kaban-repos-'))
+  const worktreesDir = mkdtempSync(join(tmpdir(), 'kaban-wt-'))
+  try {
+    const client = new BunGitClient(reposDir, worktreesDir)
+    await expect(
+      client.cloneRepository({
+        name: '../escape',
+        url: 'https://example.com/repo.git',
+      }),
+    ).rejects.toThrow(/inside/)
+  } finally {
+    rmSync(reposDir, { recursive: true, force: true })
+    rmSync(worktreesDir, { recursive: true, force: true })
+  }
+})
