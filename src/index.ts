@@ -26,7 +26,8 @@ const app = createApp({
 })
 
 Bun.serve({
-  port: 3000,
+  hostname: config.bindHost,
+  port: config.port,
   routes: {
     '/': index,
   },
@@ -37,4 +38,6 @@ Bun.serve({
   },
 })
 
-console.log('Kaban Ops listening on http://localhost:3000')
+console.log(
+  `Kaban Ops listening on http://${config.bindHost}:${config.port}`,
+)
