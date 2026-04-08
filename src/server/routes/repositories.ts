@@ -24,6 +24,9 @@ const bodySchema = z.object({
     .string()
     .min(1)
     .max(2048)
+    .refine((s) => !s.includes('..'), {
+      message: 'url must not contain ".." path segments',
+    })
     .refine(
       (s) => HTTPS_URL_RE.test(s) || SSH_URL_RE.test(s),
       {

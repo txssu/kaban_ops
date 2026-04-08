@@ -348,6 +348,26 @@ test('POST /api/repositories rejects ext:: URLs', async () => {
   expect(res.status).toBe(400)
 })
 
+test('POST /api/repositories rejects URL paths containing ..', async () => {
+  const db = makeDb()
+  const app = createApp({
+    db,
+    bus: new SseBus(),
+    git: new StubGit(),
+    onStopTask: () => {},
+    config: defaultConfig,
+  })
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'traverse',
+      url: 'https://github.com/user/../../etc/passwd',
+    }),
+  })
+  expect(res.status).toBe(400)
+})
+
 test('POST /api/repositories rejects file:// URLs', async () => {
   const db = makeDb()
   const app = createApp({

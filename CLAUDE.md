@@ -76,8 +76,13 @@ not the deprecated object form `(t) => ({ name: index(...) })`.
 
 **Agent SDK call shape.** `ClaudeAgentRunner` calls
 `query({ prompt, options: { cwd, abortController, permissionMode:
-'bypassPermissions', systemPrompt: { type: 'preset', preset: 'claude_code' },
-settingSources: ['user', 'project', 'local'] } })`. The reviewer asks for
+'bypassPermissions', allowDangerouslySkipPermissions: true,
+systemPrompt: { type: 'preset', preset: 'claude_code' },
+settingSources: ['user', 'project', 'local'] } })`. **Both permission
+flags are required** per SDK v0.2.92 docs (`sdk.d.ts:1184-1196`):
+`bypassPermissions` is the named mode AND `allowDangerouslySkipPermissions`
+must be set as an explicit safety acknowledgement. Removing either silently
+degrades to a less-permissive mode at runtime. The reviewer asks for
 a fenced JSON block at the end of its response and parses it with Zod —
 there is no native `generateObject` in the Agent SDK.
 
