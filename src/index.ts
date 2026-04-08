@@ -22,6 +22,7 @@ const app = createApp({
   bus,
   git,
   onStopTask: (taskId) => orchestrator.abortTask(taskId),
+  config,
 })
 
 Bun.serve({

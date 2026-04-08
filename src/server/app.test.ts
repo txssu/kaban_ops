@@ -6,6 +6,7 @@ import { createApp } from './app'
 import type { GitClient } from '../orchestrator/git-client'
 import { tasks, runs } from '../db/schema'
 import { eq } from 'drizzle-orm'
+import { defaultConfig } from '../shared/config'
 
 class StubGit implements GitClient {
   async cloneRepository(input: { name: string; url: string }) {
@@ -29,6 +30,7 @@ test('POST /api/repositories clones and stores the repo', async () => {
     bus: new SseBus(),
     git: new StubGit(),
     onStopTask: () => {},
+    config: defaultConfig,
   })
   const res = await app.request('/api/repositories', {
     method: 'POST',
@@ -61,6 +63,7 @@ test('GET /api/repositories returns the list', async () => {
     bus: new SseBus(),
     git: new StubGit(),
     onStopTask: () => {},
+    config: defaultConfig,
   })
   const res = await app.request('/api/repositories')
   expect(res.status).toBe(200)
@@ -92,6 +95,7 @@ test('POST /api/tasks creates a task in BACKLOG', async () => {
     bus: new SseBus(),
     git: new StubGit(),
     onStopTask: () => {},
+    config: defaultConfig,
   })
 
   const res = await app.request('/api/tasks', {
@@ -139,6 +143,7 @@ test('GET /api/tasks returns tasks with active_run_started_at derived', async ()
     bus: new SseBus(),
     git: new StubGit(),
     onStopTask: () => {},
+    config: defaultConfig,
   })
   const res = await app.request('/api/tasks')
   const body = (await res.json()) as Array<{ activeRunStartedAt: number | null }>
@@ -168,6 +173,7 @@ test('PATCH /api/tasks/:id rejects moves into PROGRESS', async () => {
     bus: new SseBus(),
     git: new StubGit(),
     onStopTask: () => {},
+    config: defaultConfig,
   })
   const res = await app.request(`/api/tasks/${task!.id}`, {
     method: 'PATCH',
@@ -201,6 +207,7 @@ test('PATCH /api/tasks/:id manual HUMAN_REVIEW→TODO clears attempts and failur
     bus: new SseBus(),
     git: new StubGit(),
     onStopTask: () => {},
+    config: defaultConfig,
   })
   const res = await app.request(`/api/tasks/${task!.id}`, {
     method: 'PATCH',
@@ -248,6 +255,7 @@ test('DELETE /api/tasks/:id removes the task and blocks deletion of active tasks
     bus: new SseBus(),
     git: new StubGit(),
     onStopTask: () => {},
+    config: defaultConfig,
   })
   const ok = await app.request(`/api/tasks/${t1!.id}`, { method: 'DELETE' })
   expect(ok.status).toBe(200)
@@ -281,10 +289,41 @@ test('POST /api/tasks/:id/stop calls onStopTask callback', async () => {
     bus: new SseBus(),
     git: new StubGit(),
     onStopTask: (id) => stopped.push(id),
+    config: defaultConfig,
   })
   const res = await app.request(`/api/tasks/${task!.id}/stop`, {
     method: 'POST',
   })
   expect(res.status).toBe(200)
   expect(stopped).toEqual([task!.id])
+})
+
+test('GET /api/config returns only operational limits', async () => {
+  const db = makeDb()
+  const app = createApp({
+    db,
+    bus: new SseBus(),
+    git: new StubGit(),
+    onStopTask: () => {},
+    config: {
+      progressLimit: 4,
+      aiReviewLimit: 2,
+      maxAttempts: 5,
+      taskTimeoutMs: 60_000,
+      bindHost: '127.0.0.1',
+      port: 3000,
+    },
+  })
+  const res = await app.request('/api/config')
+  expect(res.status).toBe(200)
+  const body = (await res.json()) as Record<string, unknown>
+  expect(body).toEqual({
+    progressLimit: 4,
+    aiReviewLimit: 2,
+    maxAttempts: 5,
+  })
+  // Sanity — nothing else leaks.
+  expect(body.bindHost).toBeUndefined()
+  expect(body.port).toBeUndefined()
+  expect(body.taskTimeoutMs).toBeUndefined()
 })
