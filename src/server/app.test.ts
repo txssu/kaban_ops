@@ -327,3 +327,123 @@ test('GET /api/config returns only operational limits', async () => {
   expect(body.port).toBeUndefined()
   expect(body.taskTimeoutMs).toBeUndefined()
 })
+
+test('POST /api/repositories rejects ext:: URLs', async () => {
+  const db = makeDb()
+  const app = createApp({
+    db,
+    bus: new SseBus(),
+    git: new StubGit(),
+    onStopTask: () => {},
+    config: defaultConfig,
+  })
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'evil',
+      url: "ext::sh -c 'echo pwned'",
+    }),
+  })
+  expect(res.status).toBe(400)
+})
+
+test('POST /api/repositories rejects file:// URLs', async () => {
+  const db = makeDb()
+  const app = createApp({
+    db,
+    bus: new SseBus(),
+    git: new StubGit(),
+    onStopTask: () => {},
+    config: defaultConfig,
+  })
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'evil',
+      url: 'file:///etc/passwd',
+    }),
+  })
+  expect(res.status).toBe(400)
+})
+
+test('POST /api/repositories rejects URLs containing whitespace', async () => {
+  const db = makeDb()
+  const app = createApp({
+    db,
+    bus: new SseBus(),
+    git: new StubGit(),
+    onStopTask: () => {},
+    config: defaultConfig,
+  })
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'evil',
+      url: 'https://github.com/a/b.git --upload-pack=echo',
+    }),
+  })
+  expect(res.status).toBe(400)
+})
+
+test('POST /api/repositories accepts a plain https URL', async () => {
+  const db = makeDb()
+  const app = createApp({
+    db,
+    bus: new SseBus(),
+    git: new StubGit(),
+    onStopTask: () => {},
+    config: defaultConfig,
+  })
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'proj-https',
+      url: 'https://github.com/example/proj.git',
+    }),
+  })
+  expect(res.status).toBe(201)
+})
+
+test('POST /api/repositories accepts a git@host:path URL', async () => {
+  const db = makeDb()
+  const app = createApp({
+    db,
+    bus: new SseBus(),
+    git: new StubGit(),
+    onStopTask: () => {},
+    config: defaultConfig,
+  })
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'proj-ssh',
+      url: 'git@github.com:example/proj.git',
+    }),
+  })
+  expect(res.status).toBe(201)
+})
+
+test('POST /api/repositories rejects an oversized url', async () => {
+  const db = makeDb()
+  const app = createApp({
+    db,
+    bus: new SseBus(),
+    git: new StubGit(),
+    onStopTask: () => {},
+    config: defaultConfig,
+  })
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'big',
+      url: 'https://github.com/' + 'a'.repeat(3000),
+    }),
+  })
+  expect(res.status).toBe(400)
+})

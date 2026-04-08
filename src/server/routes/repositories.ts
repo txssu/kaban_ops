@@ -6,9 +6,23 @@ import type { Db } from '../../db/client'
 import type { GitClient } from '../../orchestrator/git-client'
 import type { SseBus } from '../sse-bus'
 
+const HTTPS_URL_RE =
+  /^https:\/\/[\w.-]+(?::\d+)?\/[\w./~\-:%@]+?(?:\.git)?$/
+const SSH_URL_RE = /^git@[\w.-]+:[\w./~\-]+?(?:\.git)?$/
+
 const bodySchema = z.object({
-  name: z.string().min(1).optional(),
-  url: z.string().min(1),
+  name: z.string().min(1).max(100).optional(),
+  url: z
+    .string()
+    .min(1)
+    .max(2048)
+    .refine(
+      (s) => HTTPS_URL_RE.test(s) || SSH_URL_RE.test(s),
+      {
+        message:
+          'only https://… or git@host:path URLs are allowed (no ext::, file://, ssh://, or whitespace)',
+      },
+    ),
 })
 
 export function createRepositoryRoutes(deps: {
