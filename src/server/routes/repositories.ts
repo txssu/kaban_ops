@@ -11,7 +11,15 @@ const HTTPS_URL_RE =
 const SSH_URL_RE = /^git@[\w.-]+:[\w./~\-]+?(?:\.git)?$/
 
 const bodySchema = z.object({
-  name: z.string().min(1).max(100).optional(),
+  name: z
+    .string()
+    .min(1)
+    .max(100)
+    .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/, {
+      message:
+        'name must start with an alphanumeric and contain only A-Z, a-z, 0-9, ., _, -',
+    })
+    .optional(),
   url: z
     .string()
     .min(1)
@@ -104,5 +112,6 @@ export function createRepositoryRoutes(deps: {
 
 function deriveName(url: string): string {
   const match = url.match(/([^\/:]+?)(?:\.git)?$/)
-  return match?.[1] ?? 'repo'
+  const candidate = match?.[1] ?? 'repo'
+  return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(candidate) ? candidate : 'repo'
 }

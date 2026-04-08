@@ -447,3 +447,103 @@ test('POST /api/repositories rejects an oversized url', async () => {
   })
   expect(res.status).toBe(400)
 })
+
+test('POST /api/repositories rejects name with path traversal', async () => {
+  const db = makeDb()
+  const app = createApp({
+    db,
+    bus: new SseBus(),
+    git: new StubGit(),
+    onStopTask: () => {},
+    config: defaultConfig,
+  })
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: '../../.ssh/authorized_keys',
+      url: 'https://github.com/example/proj.git',
+    }),
+  })
+  expect(res.status).toBe(400)
+})
+
+test('POST /api/repositories rejects name with leading dot', async () => {
+  const db = makeDb()
+  const app = createApp({
+    db,
+    bus: new SseBus(),
+    git: new StubGit(),
+    onStopTask: () => {},
+    config: defaultConfig,
+  })
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: '.hidden',
+      url: 'https://github.com/example/proj.git',
+    }),
+  })
+  expect(res.status).toBe(400)
+})
+
+test('POST /api/repositories rejects name with slash', async () => {
+  const db = makeDb()
+  const app = createApp({
+    db,
+    bus: new SseBus(),
+    git: new StubGit(),
+    onStopTask: () => {},
+    config: defaultConfig,
+  })
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'foo/bar',
+      url: 'https://github.com/example/proj.git',
+    }),
+  })
+  expect(res.status).toBe(400)
+})
+
+test('POST /api/repositories rejects name with NUL byte', async () => {
+  const db = makeDb()
+  const app = createApp({
+    db,
+    bus: new SseBus(),
+    git: new StubGit(),
+    onStopTask: () => {},
+    config: defaultConfig,
+  })
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'foo\x00bar',
+      url: 'https://github.com/example/proj.git',
+    }),
+  })
+  expect(res.status).toBe(400)
+})
+
+test('POST /api/repositories accepts a reasonable name', async () => {
+  const db = makeDb()
+  const app = createApp({
+    db,
+    bus: new SseBus(),
+    git: new StubGit(),
+    onStopTask: () => {},
+    config: defaultConfig,
+  })
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'my_proj-v2.0',
+      url: 'https://github.com/example/proj.git',
+    }),
+  })
+  expect(res.status).toBe(201)
+})
