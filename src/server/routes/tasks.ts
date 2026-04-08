@@ -13,15 +13,18 @@ import {
 } from '../../domain/task'
 import { TASK_COLUMNS } from '../../shared/types'
 
+const TITLE_MAX = 200
+const DESCRIPTION_MAX = 10_000
+
 const createSchema = z.object({
-  title: z.string().min(1),
-  description: z.string().default(''),
+  title: z.string().min(1).max(TITLE_MAX),
+  description: z.string().max(DESCRIPTION_MAX).default(''),
   repositoryId: z.number().int().positive(),
 })
 
 const patchSchema = z.object({
-  title: z.string().min(1).optional(),
-  description: z.string().optional(),
+  title: z.string().min(1).max(TITLE_MAX).optional(),
+  description: z.string().max(DESCRIPTION_MAX).optional(),
   repositoryId: z.number().int().positive().optional(),
   column: z.enum(TASK_COLUMNS).optional(),
   position: z.number().int().nonnegative().optional(),

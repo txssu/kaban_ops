@@ -547,3 +547,47 @@ test('POST /api/repositories accepts a reasonable name', async () => {
   })
   expect(res.status).toBe(201)
 })
+
+test('POST /api/tasks rejects oversized title', async () => {
+  const db = makeDb()
+  const repo = seedRepo(db)
+  const app = createApp({
+    db,
+    bus: new SseBus(),
+    git: new StubGit(),
+    onStopTask: () => {},
+    config: defaultConfig,
+  })
+  const res = await app.request('/api/tasks', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      title: 'a'.repeat(300),
+      description: '',
+      repositoryId: repo.id,
+    }),
+  })
+  expect(res.status).toBe(400)
+})
+
+test('POST /api/tasks rejects oversized description', async () => {
+  const db = makeDb()
+  const repo = seedRepo(db)
+  const app = createApp({
+    db,
+    bus: new SseBus(),
+    git: new StubGit(),
+    onStopTask: () => {},
+    config: defaultConfig,
+  })
+  const res = await app.request('/api/tasks', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      title: 'ok',
+      description: 'x'.repeat(20_000),
+      repositoryId: repo.id,
+    }),
+  })
+  expect(res.status).toBe(400)
+})
