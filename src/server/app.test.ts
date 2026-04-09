@@ -367,6 +367,62 @@ test('POST /api/repositories rejects URLs containing whitespace', async () => {
   expect(res.status).toBe(400)
 })
 
+test('POST /api/repositories rejects hostname beginning with a dash', async () => {
+  const db = makeDb()
+  const app = buildApp(db)
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'evil',
+      url: 'https://-evil.com/foo/bar.git',
+    }),
+  })
+  expect(res.status).toBe(400)
+})
+
+test('POST /api/repositories rejects hostname beginning with a dot', async () => {
+  const db = makeDb()
+  const app = buildApp(db)
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'evil',
+      url: 'https://.foo/bar.git',
+    }),
+  })
+  expect(res.status).toBe(400)
+})
+
+test('POST /api/repositories rejects hostname with consecutive dots', async () => {
+  const db = makeDb()
+  const app = buildApp(db)
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'evil',
+      url: 'https://github...com/foo/bar.git',
+    }),
+  })
+  expect(res.status).toBe(400)
+})
+
+test('POST /api/repositories rejects hostname with trailing dot', async () => {
+  const db = makeDb()
+  const app = buildApp(db)
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'evil',
+      url: 'https://github.com./foo/bar.git',
+    }),
+  })
+  expect(res.status).toBe(400)
+})
+
 test('POST /api/repositories accepts a plain https URL', async () => {
   const db = makeDb()
   const app = buildApp(db)
@@ -404,6 +460,34 @@ test('POST /api/repositories accepts an ssh:// URL', async () => {
     body: JSON.stringify({
       name: 'proj-sshurl',
       url: 'ssh://git@github.com/example/proj.git',
+    }),
+  })
+  expect(res.status).toBe(201)
+})
+
+test('POST /api/repositories accepts a git@host:path URL with an alt username', async () => {
+  const db = makeDb()
+  const app = buildApp(db)
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'proj-gitea',
+      url: 'gitea@git.corp.local:team/proj.git',
+    }),
+  })
+  expect(res.status).toBe(201)
+})
+
+test('POST /api/repositories accepts ssh://host/path without a username', async () => {
+  const db = makeDb()
+  const app = buildApp(db)
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'proj-sshnouser',
+      url: 'ssh://git.corp.local/team/proj.git',
     }),
   })
   expect(res.status).toBe(201)

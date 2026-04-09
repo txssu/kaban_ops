@@ -93,13 +93,21 @@ true, systemPrompt: { type: 'preset', preset: 'claude_code' },
 settingSources: ['user', 'project', 'local'] }`. Both permission flags
 are set per the SDK v0.2.92 type declarations (`sdk.d.ts:1184-1196`),
 which state that `allowDangerouslySkipPermissions: true` "must be set"
-alongside `permissionMode: 'bypassPermissions'`. This is a reading of
-the type declarations — end-to-end runtime verification has not been
-done. Do not remove either flag without first confirming the SDK still
-enters bypass mode. The reviewer asks for a fenced JSON block at the
-end of its response; the parser lives in `parseReviewerResult` (also in
-`claude-agent-runner.ts`) and tolerates single-line or multi-line
-blocks. There is no native `generateObject` in the Agent SDK.
+alongside `permissionMode: 'bypassPermissions'`. That is the
+declaration-level justification; the runtime probe is
+`assertBypassPermissionMode`, which reads the `permissionMode` field
+of the `system/init` message the SDK emits at the start of every
+query (see `sdk.d.ts:2643-2672`) and throws if the realised mode is
+not `'bypassPermissions'`. If a future SDK version silently
+downgrades the request, that assertion fires before any tool runs
+and the executor fails hard instead of running under a weaker mode.
+Do not remove either permission flag and do not remove the
+assertion without first confirming the replacement still fails
+closed. The reviewer asks for a fenced JSON block at the end of its
+response; the parser lives in `parseReviewerResult` (also in
+`claude-agent-runner.ts`) and takes the **last** fenced block so an
+earlier inline `json` example cannot be mistaken for the verdict.
+There is no native `generateObject` in the Agent SDK.
 
 **Abort signal bridging.** The runner creates a fresh `AbortController`
 and forwards `input.signal` into it via an event listener cleaned up in

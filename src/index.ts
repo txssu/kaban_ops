@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs'
 import index from './index.html'
 import { createDb } from './db/client'
 import { createApp } from './server/app'
@@ -13,15 +12,25 @@ const db = createDb()
 const bus = new SseBus()
 const git = new BunGitClient(paths.reposDir, paths.worktreesDir)
 const runner = new ClaudeAgentRunner()
-const configFilePresent = existsSync(paths.configFile)
-const config = loadConfig(paths.configFile)
-if (!configFilePresent && config.bindHost === '127.0.0.1') {
+const { config, fromFile: configFromFile } = loadConfig(paths.configFile)
+if (!configFromFile && config.bindHost === '127.0.0.1') {
   // First-run UX: make the (intentional) loopback-only default visible
   // so an operator running this on a remote box / inside a container
   // knows why the server is unreachable from outside.
+  //
+  // Crucially, the warning must repeat the threat-model hazard — this
+  // process runs an agent with bypassed permissions and has no HTTP
+  // auth, so flipping bindHost off 127.0.0.1 exposes an unauthenticated
+  // RCE to that interface. An operator debugging connectivity at 11pm
+  // should not be able to read the "how" without also reading the "why not".
   console.warn(
-    `[kaban] no ${paths.configFile} found; bindHost defaulted to 127.0.0.1. ` +
-      `Set { "bindHost": "0.0.0.0" } in config.json for external access.`,
+    `[kaban] no ${paths.configFile} found; bindHost defaulted to 127.0.0.1 (loopback only).\n` +
+      `[kaban] DO NOT change bindHost to 0.0.0.0 or a public interface:\n` +
+      `[kaban]   this server has NO authentication and runs an AI agent with\n` +
+      `[kaban]   bypassed permissions. Changing bindHost exposes an\n` +
+      `[kaban]   unauthenticated remote code execution to that interface.\n` +
+      `[kaban] For remote access, use an SSH tunnel or a reverse proxy that\n` +
+      `[kaban] performs its own authentication. See CLAUDE.md ("Threat model").`,
   )
 }
 const orchestrator = new Orchestrator({ db, runner, git, bus, config })

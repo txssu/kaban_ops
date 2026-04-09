@@ -1,6 +1,7 @@
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { z } from 'zod'
 
+// Field order mirrors `defaultConfig` below — keep them in sync.
 const configSchema = z.object({
   progressLimit: z.number().int().nonnegative(),
   aiReviewLimit: z.number().int().nonnegative(),
@@ -24,17 +25,39 @@ export const defaultConfig: Readonly<Config> = Object.freeze({
 })
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value) &&
-    Object.getPrototypeOf(value) === Object.prototype
-  )
+  // JSON.parse only ever produces arrays, objects, or primitives — we
+  // just need to exclude arrays and non-objects. No prototype check.
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-export function loadConfig(file: string): Config {
-  if (!existsSync(file)) return { ...defaultConfig }
-  const raw = readFileSync(file, 'utf8')
+export interface LoadConfigResult {
+  /** Frozen, validated config. Consumers can destructure/copy but not mutate. */
+  config: Readonly<Config>
+  /** True when the file existed and was parsed; false when defaults were used. */
+  fromFile: boolean
+}
+
+/**
+ * Load config from `file`, falling back to `defaultConfig` when the
+ * file does not exist. The returned `config` is always frozen so that
+ * the "defaults are immutable" invariant holds for every caller —
+ * tests included.
+ *
+ * A single `readFileSync` is used; there is no separate `existsSync`
+ * probe, so there is no TOCTOU window between "does the file exist?"
+ * and "read it". `fromFile` reflects the outcome of the read itself,
+ * not a prior stat call.
+ */
+export function loadConfig(file: string): LoadConfigResult {
+  let raw: string
+  try {
+    raw = readFileSync(file, 'utf8')
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { config: defaultConfig, fromFile: false }
+    }
+    throw err
+  }
   let parsed: unknown
   try {
     parsed = JSON.parse(raw)
@@ -49,5 +72,5 @@ export function loadConfig(file: string): Config {
     )
   }
   const merged = { ...defaultConfig, ...parsed }
-  return configSchema.parse(merged)
+  return { config: Object.freeze(configSchema.parse(merged)), fromFile: true }
 }

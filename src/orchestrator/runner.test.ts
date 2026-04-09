@@ -3,6 +3,8 @@ import { FakeAIRunner } from './runner'
 import {
   parseReviewerResult,
   buildAgentQueryOptions,
+  assertBypassPermissionMode,
+  EXPECTED_PERMISSION_MODE,
 } from './claude-agent-runner'
 
 test('FakeAIRunner.execute returns the queued result and records the call', async () => {
@@ -76,6 +78,28 @@ test('parseReviewerResult accepts a single-line block with no newlines at all', 
   })
 })
 
+test('parseReviewerResult picks the LAST fenced json block, not the first', () => {
+  // The reviewer is instructed to put the verdict "at the very end",
+  // but the model often illustrates points with inline examples. The
+  // parser must match the final block, not any earlier one.
+  const text = [
+    'Here is an example of what a rejection might look like:',
+    '```json',
+    '{"verdict":"rejected","summary":"example, not real"}',
+    '```',
+    '',
+    'My actual verdict:',
+    '',
+    '```json',
+    '{"verdict":"approved","summary":"all good"}',
+    '```',
+  ].join('\n')
+  expect(parseReviewerResult(text)).toEqual({
+    verdict: 'approved',
+    summary: 'all good',
+  })
+})
+
 test('parseReviewerResult throws when no fenced JSON block is present', () => {
   expect(() => parseReviewerResult('just prose, no block')).toThrow(
     /code block/,
@@ -110,4 +134,47 @@ test('buildAgentQueryOptions uses the claude_code preset system prompt', () => {
   const controller = new AbortController()
   const opts = buildAgentQueryOptions('/tmp', controller)
   expect(opts.systemPrompt).toEqual({ type: 'preset', preset: 'claude_code' })
+})
+
+test('EXPECTED_PERMISSION_MODE is bypassPermissions', () => {
+  // Load-bearing: if this constant drifts, the runtime assertion below
+  // can silently start approving whatever mode the SDK chooses.
+  expect(EXPECTED_PERMISSION_MODE).toBe('bypassPermissions')
+})
+
+test('assertBypassPermissionMode ignores non-init messages', () => {
+  // Result, assistant, tool_use, etc. messages must not trip the check.
+  expect(() =>
+    assertBypassPermissionMode({ type: 'result', subtype: 'success' }),
+  ).not.toThrow()
+  expect(() =>
+    assertBypassPermissionMode({ type: 'system', subtype: 'other' }),
+  ).not.toThrow()
+  expect(() => assertBypassPermissionMode({ type: 'assistant' })).not.toThrow()
+})
+
+test('assertBypassPermissionMode accepts system/init with bypassPermissions', () => {
+  expect(() =>
+    assertBypassPermissionMode({
+      type: 'system',
+      subtype: 'init',
+      permissionMode: 'bypassPermissions',
+    }),
+  ).not.toThrow()
+})
+
+test('assertBypassPermissionMode throws if SDK downgraded to default mode', () => {
+  expect(() =>
+    assertBypassPermissionMode({
+      type: 'system',
+      subtype: 'init',
+      permissionMode: 'default',
+    }),
+  ).toThrow(/permissionMode/)
+})
+
+test('assertBypassPermissionMode throws if permissionMode is missing', () => {
+  expect(() =>
+    assertBypassPermissionMode({ type: 'system', subtype: 'init' }),
+  ).toThrow()
 })
