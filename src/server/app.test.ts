@@ -307,7 +307,9 @@ test('POST /api/repositories rejects ext:: URLs', async () => {
   expect(res.status).toBe(400)
 })
 
-test('POST /api/repositories rejects URL paths containing ..', async () => {
+test('POST /api/repositories rejects URL paths containing percent-encoded traversal', async () => {
+  // The URL char class excludes `%`, so percent-encoded `..` sequences
+  // never match any of the three URL shapes.
   const db = makeDb()
   const app = buildApp(db)
   const res = await app.request('/api/repositories', {
@@ -315,7 +317,23 @@ test('POST /api/repositories rejects URL paths containing ..', async () => {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       name: 'traverse',
-      url: 'https://github.com/user/../../etc/passwd',
+      url: 'https://github.com/user/%2e%2e/etc/passwd',
+    }),
+  })
+  expect(res.status).toBe(400)
+})
+
+test('POST /api/repositories rejects URLs with embedded credentials', async () => {
+  // The host char class excludes `:` and `@`, so user:pass@host shapes
+  // fail the regex regardless of what comes after.
+  const db = makeDb()
+  const app = buildApp(db)
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'creds',
+      url: 'https://user:token@github.com/foo/bar.git',
     }),
   })
   expect(res.status).toBe(400)
@@ -370,8 +388,36 @@ test('POST /api/repositories accepts a git@host:path URL', async () => {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      name: 'proj-ssh',
+      name: 'proj-scp',
       url: 'git@github.com:example/proj.git',
+    }),
+  })
+  expect(res.status).toBe(201)
+})
+
+test('POST /api/repositories accepts an ssh:// URL', async () => {
+  const db = makeDb()
+  const app = buildApp(db)
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'proj-sshurl',
+      url: 'ssh://git@github.com/example/proj.git',
+    }),
+  })
+  expect(res.status).toBe(201)
+})
+
+test('POST /api/repositories accepts an https URL with an explicit port', async () => {
+  const db = makeDb()
+  const app = buildApp(db)
+  const res = await app.request('/api/repositories', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'proj-port',
+      url: 'https://gh.corp.local:8443/team/proj.git',
     }),
   })
   expect(res.status).toBe(201)

@@ -6,15 +6,31 @@ import type { Db } from '../../db/client'
 import type { GitClient } from '../../orchestrator/git-client'
 import type { SseBus } from '../sse-bus'
 
-const HTTPS_URL_RE =
-  /^https:\/\/[\w.-]+(?::\d+)?\/[\w./~\-:%@]+?(?:\.git)?$/
-const SSH_URL_RE = /^git@[\w.-]+:[\w./~\-]+?(?:\.git)?$/
+// Git URL allowlist. Three accepted forms:
+//   1. HTTPS:          https://host[:port]/path[.git]
+//   2. SCP-like SSH:   git@host:path[.git]
+//   3. ssh:// URL:     ssh://user@host[:port]/path[.git]
+// Path characters are deliberately narrow — word chars, slash, dot,
+// dash, tilde — no `:`, `@`, or `%`, to avoid giving any weight to URL
+// percent-encoded traversal or credential smuggling. Symmetry across
+// all three shapes is intentional.
+const URL_HOST = /[\w.-]+/
+const URL_PATH = /[\w./~-]+?/
+const HTTPS_URL_RE = new RegExp(
+  `^https://${URL_HOST.source}(?::\\d+)?/${URL_PATH.source}(?:\\.git)?$`,
+)
+const SCP_URL_RE = new RegExp(
+  `^git@${URL_HOST.source}:${URL_PATH.source}(?:\\.git)?$`,
+)
+const SSH_URL_RE = new RegExp(
+  `^ssh://${URL_HOST.source}@${URL_HOST.source}(?::\\d+)?/${URL_PATH.source}(?:\\.git)?$`,
+)
 
 const bodySchema = z.object({
   name: z
     .string()
     .min(1)
-    .max(100)
+    .max(100, { message: 'name must be at most 100 characters' })
     .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/, {
       message:
         'name must start with an alphanumeric and contain only A-Z, a-z, 0-9, ., _, -',
@@ -24,14 +40,12 @@ const bodySchema = z.object({
     .string()
     .min(1)
     .max(2048)
-    .refine((s) => !s.includes('..'), {
-      message: 'url must not contain ".." path segments',
-    })
     .refine(
-      (s) => HTTPS_URL_RE.test(s) || SSH_URL_RE.test(s),
+      (s) =>
+        HTTPS_URL_RE.test(s) || SCP_URL_RE.test(s) || SSH_URL_RE.test(s),
       {
         message:
-          'only https://… or git@host:path URLs are allowed (no ext::, file://, ssh://, or whitespace)',
+          'url must be https://host/path, git@host:path, or ssh://user@host/path (no other schemes, no whitespace)',
       },
     ),
 })
