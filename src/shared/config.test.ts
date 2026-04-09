@@ -40,12 +40,35 @@ test('loadConfig accepts custom bindHost and port', () => {
   rmSync(dir, { recursive: true })
 })
 
-test('loadConfig throws on invalid JSON', () => {
+test('loadConfig throws on invalid JSON with a message that includes the file path', () => {
   const dir = mkdtempSync(join(tmpdir(), 'kaban-cfg-'))
   const file = join(dir, 'config.json')
   writeFileSync(file, '{ not json')
-  expect(() => loadConfig(file)).toThrow()
+  // Use the file-path fragment to verify the helpful wrapper error
+  // fired rather than the raw SyntaxError.
+  expect(() => loadConfig(file)).toThrow(/config.json/)
+  expect(() => loadConfig(file)).toThrow(/failed to parse/)
   rmSync(dir, { recursive: true })
+})
+
+test('loadConfig throws when the JSON root is not an object', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'kaban-cfg-'))
+  const file = join(dir, 'config.json')
+  for (const content of ['42', '"hello"', 'null', 'true', '[]']) {
+    writeFileSync(file, content)
+    expect(() => loadConfig(file)).toThrow(/must be a JSON object/)
+  }
+  rmSync(dir, { recursive: true })
+})
+
+test('defaultConfig is frozen and cannot be mutated', () => {
+  // Runtime check: assigning to a frozen object throws in strict mode
+  // (which Bun modules run under by default).
+  expect(() => {
+    // Cast through unknown to bypass the Readonly type guard and
+    // actually attempt the runtime mutation.
+    ;(defaultConfig as unknown as { port: number }).port = 9999
+  }).toThrow()
 })
 
 test('loadConfig throws a helpful error on type-wrong values', () => {

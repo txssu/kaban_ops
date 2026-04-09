@@ -101,7 +101,12 @@ export function createRepositoryRoutes(deps: {
       })
       return c.json(row, 201)
     } catch (err) {
-      return c.json({ error: (err as Error).message }, 500)
+      // Do NOT echo `err.message` to the client: git's clone errors
+      // routinely include the resolved URL (with any embedded tokens),
+      // local filesystem paths, and DNS error details. Log server-side,
+      // return a generic message.
+      console.error('[repositories] clone failed:', err)
+      return c.json({ error: 'failed to clone repository' }, 500)
     }
   })
 
