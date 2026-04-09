@@ -4,6 +4,16 @@ Local AI orchestrator with a kanban UI. One Bun process runs everything:
 Hono HTTP API, the React frontend (via Bun HTML imports), the orchestrator
 tick loop, and SQLite.
 
+## Threat model
+
+**Single operator, localhost only.** The HTTP API has no authentication
+and executes arbitrary shell commands on behalf of the user through the
+Claude Agent runner. The default `bindHost` is `127.0.0.1` and no endpoint
+is authenticated — including `GET /api/config`. If you set `bindHost` to
+anything else, you are deliberately exposing an unauthenticated RCE to
+that interface. Don't. If you need remote access, put it behind an
+SSH tunnel or a reverse proxy that does its own auth.
+
 ## Run
 
 - `bun src/index.ts` — start server on http://localhost:3000
@@ -75,16 +85,21 @@ not the deprecated object form `(t) => ({ name: index(...) })`.
 `db.transaction(...)` and the UPDATE includes a `column = from` guard.
 
 **Agent SDK call shape.** `ClaudeAgentRunner` calls
-`query({ prompt, options: { cwd, abortController, permissionMode:
-'bypassPermissions', allowDangerouslySkipPermissions: true,
-systemPrompt: { type: 'preset', preset: 'claude_code' },
-settingSources: ['user', 'project', 'local'] } })`. **Both permission
-flags are required** per SDK v0.2.92 docs (`sdk.d.ts:1184-1196`):
-`bypassPermissions` is the named mode AND `allowDangerouslySkipPermissions`
-must be set as an explicit safety acknowledgement. Removing either silently
-degrades to a less-permissive mode at runtime. The reviewer asks for
-a fenced JSON block at the end of its response and parses it with Zod —
-there is no native `generateObject` in the Agent SDK.
+`query({ prompt, options: buildAgentQueryOptions(cwd, controller) })`
+where `buildAgentQueryOptions` is a pure function in
+`claude-agent-runner.ts` that returns `{ cwd, abortController,
+permissionMode: 'bypassPermissions', allowDangerouslySkipPermissions:
+true, systemPrompt: { type: 'preset', preset: 'claude_code' },
+settingSources: ['user', 'project', 'local'] }`. Both permission flags
+are set per the SDK v0.2.92 type declarations (`sdk.d.ts:1184-1196`),
+which state that `allowDangerouslySkipPermissions: true` "must be set"
+alongside `permissionMode: 'bypassPermissions'`. This is a reading of
+the type declarations — end-to-end runtime verification has not been
+done. Do not remove either flag without first confirming the SDK still
+enters bypass mode. The reviewer asks for a fenced JSON block at the
+end of its response; the parser lives in `parseReviewerResult` (also in
+`claude-agent-runner.ts`) and tolerates single-line or multi-line
+blocks. There is no native `generateObject` in the Agent SDK.
 
 **Abort signal bridging.** The runner creates a fresh `AbortController`
 and forwards `input.signal` into it via an event listener cleaned up in

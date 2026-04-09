@@ -22,7 +22,7 @@ export function createApp(deps: AppDeps) {
   app.route('/api/repositories', createRepositoryRoutes(deps))
   app.route('/api/tasks', createTaskRoutes(deps))
   app.route('/api/events', createEventRoutes(deps))
-  app.route('/api/config', createConfigRoutes({ config: deps.config }))
+  app.route('/api/config', createConfigRoutes(deps))
 
   return app
 }

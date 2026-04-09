@@ -134,6 +134,10 @@ export function createRepositoryRoutes(deps: {
 
 function deriveName(url: string): string {
   const match = url.match(/([^\/:]+?)(?:\.git)?$/)
-  const candidate = match?.[1] ?? 'repo'
-  return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(candidate) ? candidate : 'repo'
+  const candidate = match?.[1] ?? ''
+  if (/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(candidate)) return candidate
+  // Fallback includes a timestamp suffix so two simultaneous "garbage
+  // URL" submissions don't collide on the unique `name` constraint and
+  // produce a cryptic Drizzle error for the second caller.
+  return `repo-${Date.now()}`
 }
