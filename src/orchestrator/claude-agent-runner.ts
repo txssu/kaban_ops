@@ -27,6 +27,64 @@ The "verdict" field must be exactly the string "approved" or "rejected".
 The "summary" field must contain your full markdown explanation.
 `
 
+// Symmetric tolerance: allow any whitespace (including none) on both
+// sides of the JSON body, so single-line and multi-line blocks parse.
+const REVIEWER_JSON_RE = /```json\s*([\s\S]*?)\s*```/
+
+/**
+ * Parse a reviewer agent's final message into a structured verdict.
+ * Throws a descriptive error on any of the three failure modes:
+ *   1. No fenced JSON block present
+ *   2. JSON body is not valid JSON
+ *   3. Parsed JSON does not match the reviewer schema
+ *
+ * Exported as a pure function so behaviour can be tested without
+ * standing up a real Claude Agent SDK query.
+ */
+export function parseReviewerResult(text: string): ReviewerResult {
+  const match = text.match(REVIEWER_JSON_RE)
+  if (!match || !match[1]) {
+    throw new Error('reviewer did not return a JSON code block')
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(match[1])
+  } catch (err) {
+    throw new Error(
+      `reviewer JSON block did not parse: ${(err as Error).message}`,
+    )
+  }
+  return reviewerSchema.parse(parsed)
+}
+
+type QueryOptions = NonNullable<Parameters<typeof query>[0]['options']>
+
+/**
+ * Build the Agent SDK options object for a single run.
+ *
+ * Both `permissionMode: 'bypassPermissions'` and
+ * `allowDangerouslySkipPermissions: true` are required per SDK v0.2.92
+ * (see `node_modules/@anthropic-ai/claude-agent-sdk/sdk.d.ts` lines
+ * 1184-1196). This is a reading of the type declarations; it has not
+ * been verified end-to-end at runtime. Do not remove either flag
+ * without first confirming the SDK still enters bypass mode.
+ *
+ * Exported as a pure function so tests can inspect the options shape.
+ */
+export function buildAgentQueryOptions(
+  cwd: string,
+  controller: AbortController,
+): QueryOptions {
+  return {
+    cwd,
+    abortController: controller,
+    permissionMode: 'bypassPermissions',
+    allowDangerouslySkipPermissions: true,
+    systemPrompt: { type: 'preset', preset: 'claude_code' },
+    settingSources: ['user', 'project', 'local'],
+  }
+}
+
 export class ClaudeAgentRunner implements AIRunner {
   async execute(input: AIRunnerInput): Promise<ExecutorResult> {
     const finalText = await this.runQuery(input.prompt, input)
@@ -38,21 +96,7 @@ export class ClaudeAgentRunner implements AIRunner {
       input.prompt + REVIEWER_JSON_INSTRUCTION,
       input,
     )
-
-    // Tolerant of a missing trailing newline before the closing fence.
-    const match = finalText.match(/```json\s*\n([\s\S]*?)\s*```/)
-    if (!match || !match[1]) {
-      throw new Error('reviewer did not return a JSON code block')
-    }
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(match[1])
-    } catch (err) {
-      throw new Error(
-        `reviewer JSON block did not parse: ${(err as Error).message}`,
-      )
-    }
-    return reviewerSchema.parse(parsed)
+    return parseReviewerResult(finalText)
   }
 
   private async runQuery(
@@ -69,21 +113,9 @@ export class ClaudeAgentRunner implements AIRunner {
     }
 
     try {
-      // Both permission flags are required per Agent SDK v0.2.92 docs
-      // (sdk.d.ts:1184-1196): `permissionMode: 'bypassPermissions'` is the
-      // named mode AND `allowDangerouslySkipPermissions: true` must be set
-      // alongside it as an explicit safety acknowledgement. The original
-      // review's "cargo-culting" diagnosis was wrong; both are intentional.
       const q = query({
         prompt,
-        options: {
-          cwd: input.cwd,
-          abortController: controller,
-          permissionMode: 'bypassPermissions',
-          allowDangerouslySkipPermissions: true,
-          systemPrompt: { type: 'preset', preset: 'claude_code' },
-          settingSources: ['user', 'project', 'local'],
-        },
+        options: buildAgentQueryOptions(input.cwd, controller),
       })
 
       let finalText = ''
