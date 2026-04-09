@@ -117,3 +117,40 @@ test('cloneRepository rejects a name that escapes reposDir', async () => {
     rmSync(worktreesDir, { recursive: true, force: true })
   }
 })
+
+test('cloneRepository rejects name="." (would clone into the root itself)', async () => {
+  const reposDir = mkdtempSync(join(tmpdir(), 'kaban-repos-'))
+  const worktreesDir = mkdtempSync(join(tmpdir(), 'kaban-wt-'))
+  try {
+    const client = new BunGitClient(reposDir, worktreesDir)
+    await expect(
+      client.cloneRepository({
+        name: '.',
+        url: 'https://example.com/repo.git',
+      }),
+    ).rejects.toThrow(/root itself/)
+  } finally {
+    rmSync(reposDir, { recursive: true, force: true })
+    rmSync(worktreesDir, { recursive: true, force: true })
+  }
+})
+
+test('cloneRepository rejects a sibling-prefix attack', async () => {
+  // If reposDir is /tmp/kaban-sibling, a name of "../kaban-siblingEVIL/x"
+  // resolves to /tmp/kaban-siblingEVIL/x, which would pass a naive
+  // startsWith(reposRoot) check. The `+ sep` guard catches it.
+  const parent = mkdtempSync(join(tmpdir(), 'kaban-par-'))
+  const reposDir = join(parent, 'repos')
+  const worktreesDir = join(parent, 'wt')
+  try {
+    const client = new BunGitClient(reposDir, worktreesDir)
+    await expect(
+      client.cloneRepository({
+        name: '../reposEVIL/x',
+        url: 'https://example.com/repo.git',
+      }),
+    ).rejects.toThrow(/inside/)
+  } finally {
+    rmSync(parent, { recursive: true, force: true })
+  }
+})

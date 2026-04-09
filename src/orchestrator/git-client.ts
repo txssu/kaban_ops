@@ -39,14 +39,30 @@ export class BunGitClient implements GitClient {
     url: string
   }): Promise<RepositoryInfo> {
     mkdirSync(this.reposDir, { recursive: true })
-    const localPath = resolve(join(this.reposDir, input.name))
     const reposRoot = resolve(this.reposDir)
-    if (!localPath.startsWith(reposRoot + sep) && localPath !== reposRoot) {
+    const localPath = resolve(join(this.reposDir, input.name))
+    // Containment guard. Two distinct conditions:
+    //   1. Reject anything that does NOT live strictly inside reposRoot
+    //      (the `+ sep` suffix blocks sibling-prefix attacks where
+    //      reposDir=/tmp/foo and name resolves to /tmp/foobar/evil —
+    //      startsWith alone would let that through).
+    //   2. Reject `reposRoot` itself as the clone target (happens when
+    //      name is "." or "" — we never want to clone INTO the parent
+    //      of all repos, that would shadow every other clone).
+    if (localPath === reposRoot) {
+      throw new Error(
+        `resolved clone path must be inside ${reposRoot}, got the root itself`,
+      )
+    }
+    if (!localPath.startsWith(reposRoot + sep)) {
       throw new Error(
         `resolved clone path must be inside ${reposRoot}, got ${localPath}`,
       )
     }
-    await $`git clone ${input.url} ${localPath}`.quiet()
+    // `--` terminates git option parsing so a hypothetical URL starting
+    // with `-` (blocked at the route level by the regex, but belt and
+    // braces) cannot be interpreted as `--upload-pack=...` or similar.
+    await $`git clone -- ${input.url} ${localPath}`.quiet()
     const defaultBranch = await this.detectDefaultBranch(localPath)
     return { name: input.name, localPath, defaultBranch }
   }
