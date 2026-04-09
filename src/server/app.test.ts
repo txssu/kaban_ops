@@ -23,15 +23,22 @@ class StubGit implements GitClient {
   async removeWorktree() {}
 }
 
-test('POST /api/repositories clones and stores the repo', async () => {
-  const db = makeDb()
-  const app = createApp({
+type AppOverrides = Partial<Parameters<typeof createApp>[0]>
+
+function buildApp(db: ReturnType<typeof makeDb>, overrides: AppOverrides = {}) {
+  return createApp({
     db,
     bus: new SseBus(),
     git: new StubGit(),
     onStopTask: () => {},
     config: defaultConfig,
+    ...overrides,
   })
+}
+
+test('POST /api/repositories clones and stores the repo', async () => {
+  const db = makeDb()
+  const app = buildApp(db)
   const res = await app.request('/api/repositories', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -58,13 +65,7 @@ test('GET /api/repositories returns the list', async () => {
     })
     .run()
 
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
-    config: defaultConfig,
-  })
+  const app = buildApp(db)
   const res = await app.request('/api/repositories')
   expect(res.status).toBe(200)
   const body = (await res.json()) as Array<Record<string, unknown>>
@@ -90,13 +91,7 @@ function seedRepo(db: ReturnType<typeof makeDb>) {
 test('POST /api/tasks creates a task in BACKLOG', async () => {
   const db = makeDb()
   const repo = seedRepo(db)
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
-    config: defaultConfig,
-  })
+  const app = buildApp(db)
 
   const res = await app.request('/api/tasks', {
     method: 'POST',
@@ -138,13 +133,7 @@ test('GET /api/tasks returns tasks with active_run_started_at derived', async ()
     })
     .run()
 
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
-    config: defaultConfig,
-  })
+  const app = buildApp(db)
   const res = await app.request('/api/tasks')
   const body = (await res.json()) as Array<{ activeRunStartedAt: number | null }>
   expect(body).toHaveLength(1)
@@ -168,13 +157,7 @@ test('PATCH /api/tasks/:id rejects moves into PROGRESS', async () => {
     .returning()
     .all()
 
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
-    config: defaultConfig,
-  })
+  const app = buildApp(db)
   const res = await app.request(`/api/tasks/${task!.id}`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
@@ -202,13 +185,7 @@ test('PATCH /api/tasks/:id manual HUMAN_REVIEW→TODO clears attempts and failur
     .returning()
     .all()
 
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
-    config: defaultConfig,
-  })
+  const app = buildApp(db)
   const res = await app.request(`/api/tasks/${task!.id}`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
@@ -250,13 +227,7 @@ test('DELETE /api/tasks/:id removes the task and blocks deletion of active tasks
     .returning()
     .all()
 
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
-    config: defaultConfig,
-  })
+  const app = buildApp(db)
   const ok = await app.request(`/api/tasks/${t1!.id}`, { method: 'DELETE' })
   expect(ok.status).toBe(200)
 
@@ -284,12 +255,10 @@ test('POST /api/tasks/:id/stop calls onStopTask callback', async () => {
     .all()
 
   const stopped: number[] = []
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: (id) => stopped.push(id),
-    config: defaultConfig,
+  const app = buildApp(db, {
+    onStopTask: (id) => {
+      stopped.push(id)
+    },
   })
   const res = await app.request(`/api/tasks/${task!.id}/stop`, {
     method: 'POST',
@@ -300,11 +269,7 @@ test('POST /api/tasks/:id/stop calls onStopTask callback', async () => {
 
 test('GET /api/config returns only operational limits', async () => {
   const db = makeDb()
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
+  const app = buildApp(db, {
     config: {
       progressLimit: 4,
       aiReviewLimit: 2,
@@ -330,13 +295,7 @@ test('GET /api/config returns only operational limits', async () => {
 
 test('POST /api/repositories rejects ext:: URLs', async () => {
   const db = makeDb()
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
-    config: defaultConfig,
-  })
+  const app = buildApp(db)
   const res = await app.request('/api/repositories', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -350,13 +309,7 @@ test('POST /api/repositories rejects ext:: URLs', async () => {
 
 test('POST /api/repositories rejects URL paths containing ..', async () => {
   const db = makeDb()
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
-    config: defaultConfig,
-  })
+  const app = buildApp(db)
   const res = await app.request('/api/repositories', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -370,13 +323,7 @@ test('POST /api/repositories rejects URL paths containing ..', async () => {
 
 test('POST /api/repositories rejects file:// URLs', async () => {
   const db = makeDb()
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
-    config: defaultConfig,
-  })
+  const app = buildApp(db)
   const res = await app.request('/api/repositories', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -390,13 +337,7 @@ test('POST /api/repositories rejects file:// URLs', async () => {
 
 test('POST /api/repositories rejects URLs containing whitespace', async () => {
   const db = makeDb()
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
-    config: defaultConfig,
-  })
+  const app = buildApp(db)
   const res = await app.request('/api/repositories', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -410,13 +351,7 @@ test('POST /api/repositories rejects URLs containing whitespace', async () => {
 
 test('POST /api/repositories accepts a plain https URL', async () => {
   const db = makeDb()
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
-    config: defaultConfig,
-  })
+  const app = buildApp(db)
   const res = await app.request('/api/repositories', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -430,13 +365,7 @@ test('POST /api/repositories accepts a plain https URL', async () => {
 
 test('POST /api/repositories accepts a git@host:path URL', async () => {
   const db = makeDb()
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
-    config: defaultConfig,
-  })
+  const app = buildApp(db)
   const res = await app.request('/api/repositories', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -450,13 +379,7 @@ test('POST /api/repositories accepts a git@host:path URL', async () => {
 
 test('POST /api/repositories rejects an oversized url', async () => {
   const db = makeDb()
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
-    config: defaultConfig,
-  })
+  const app = buildApp(db)
   const res = await app.request('/api/repositories', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -470,13 +393,7 @@ test('POST /api/repositories rejects an oversized url', async () => {
 
 test('POST /api/repositories rejects name with path traversal', async () => {
   const db = makeDb()
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
-    config: defaultConfig,
-  })
+  const app = buildApp(db)
   const res = await app.request('/api/repositories', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -490,13 +407,7 @@ test('POST /api/repositories rejects name with path traversal', async () => {
 
 test('POST /api/repositories rejects name with leading dot', async () => {
   const db = makeDb()
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
-    config: defaultConfig,
-  })
+  const app = buildApp(db)
   const res = await app.request('/api/repositories', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -510,13 +421,7 @@ test('POST /api/repositories rejects name with leading dot', async () => {
 
 test('POST /api/repositories rejects name with slash', async () => {
   const db = makeDb()
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
-    config: defaultConfig,
-  })
+  const app = buildApp(db)
   const res = await app.request('/api/repositories', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -530,13 +435,7 @@ test('POST /api/repositories rejects name with slash', async () => {
 
 test('POST /api/repositories rejects name with NUL byte', async () => {
   const db = makeDb()
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
-    config: defaultConfig,
-  })
+  const app = buildApp(db)
   const res = await app.request('/api/repositories', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -550,13 +449,7 @@ test('POST /api/repositories rejects name with NUL byte', async () => {
 
 test('POST /api/repositories accepts a reasonable name', async () => {
   const db = makeDb()
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
-    config: defaultConfig,
-  })
+  const app = buildApp(db)
   const res = await app.request('/api/repositories', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -571,13 +464,7 @@ test('POST /api/repositories accepts a reasonable name', async () => {
 test('POST /api/tasks rejects oversized title', async () => {
   const db = makeDb()
   const repo = seedRepo(db)
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
-    config: defaultConfig,
-  })
+  const app = buildApp(db)
   const res = await app.request('/api/tasks', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -593,13 +480,7 @@ test('POST /api/tasks rejects oversized title', async () => {
 test('POST /api/tasks rejects oversized description', async () => {
   const db = makeDb()
   const repo = seedRepo(db)
-  const app = createApp({
-    db,
-    bus: new SseBus(),
-    git: new StubGit(),
-    onStopTask: () => {},
-    config: defaultConfig,
-  })
+  const app = buildApp(db)
   const res = await app.request('/api/tasks', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
