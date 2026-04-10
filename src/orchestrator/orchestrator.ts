@@ -23,6 +23,8 @@ interface ActiveRun {
   startedAt: number
   timeoutMs: number
   promise: Promise<void>
+  pausedAt: number | null
+  totalPausedMs: number
 }
 
 export interface OrchestratorDeps {
@@ -43,10 +45,17 @@ export class Orchestrator implements OrchestratorSlotHooks {
 
   releaseSlot(taskId: number): void {
     this.paused.add(taskId)
+    const run = this.active.get(taskId)
+    if (run) run.pausedAt = Date.now()
   }
 
   reacquireSlot(taskId: number): void {
     this.paused.delete(taskId)
+    const run = this.active.get(taskId)
+    if (run && run.pausedAt !== null) {
+      run.totalPausedMs += Date.now() - run.pausedAt
+      run.pausedAt = null
+    }
   }
 
   start(tickMs: number = 500): void {
@@ -76,10 +85,12 @@ export class Orchestrator implements OrchestratorSlotHooks {
   }
 
   async tick(): Promise<void> {
-    // 1. Enforce timeouts
+    // 1. Enforce timeouts (exclude paused time)
     const now = Date.now()
     for (const run of this.active.values()) {
-      if (now - run.startedAt > run.timeoutMs) {
+      const currentPause = run.pausedAt ? now - run.pausedAt : 0
+      const activeMs = now - run.startedAt - run.totalPausedMs - currentPause
+      if (activeMs > run.timeoutMs) {
         run.abortController.abort('timeout')
       }
     }
@@ -196,6 +207,8 @@ export class Orchestrator implements OrchestratorSlotHooks {
       startedAt,
       timeoutMs: this.deps.config.taskTimeoutMs,
       promise,
+      pausedAt: null,
+      totalPausedMs: 0,
     })
   }
 
@@ -314,6 +327,8 @@ export class Orchestrator implements OrchestratorSlotHooks {
       startedAt,
       timeoutMs: this.deps.config.taskTimeoutMs,
       promise,
+      pausedAt: null,
+      totalPausedMs: 0,
     })
   }
 
