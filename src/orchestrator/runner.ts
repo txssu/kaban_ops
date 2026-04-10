@@ -4,6 +4,10 @@ export interface AIRunnerInput {
   prompt: string
   cwd: string
   signal: AbortSignal
+  taskId: number
+  runId: number
+  taskTitle: string
+  taskDescription: string
 }
 
 export interface ExecutorResult {

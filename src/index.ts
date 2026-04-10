@@ -5,15 +5,33 @@ import { SseBus } from './server/sse-bus'
 import { BunGitClient } from './orchestrator/git-client'
 import { Orchestrator } from './orchestrator/orchestrator'
 import { ClaudeAgentRunner } from './orchestrator/claude-agent-runner'
+import { ClaudeJudge } from './orchestrator/permissions/judge'
+import { PermissionCoordinator } from './orchestrator/permissions/coordinator'
+import { query as sdkQuery } from '@anthropic-ai/claude-agent-sdk'
 import { loadConfig } from './shared/config'
 import { paths } from './shared/paths'
 
 const db = createDb()
 const bus = new SseBus()
 const git = new BunGitClient(paths.reposDir, paths.worktreesDir)
-const runner = new ClaudeAgentRunner()
 const config = loadConfig(paths.configFile)
-const orchestrator = new Orchestrator({ db, runner, git, bus, config })
+
+const judge = new ClaudeJudge({
+  queryFn: sdkQuery as any,
+  model: config.judgeModel,
+  timeoutMs: config.judgeTimeoutMs,
+})
+
+// Create orchestrator first (coordinator needs slot hooks)
+const orchestrator = new Orchestrator({ db, runner: null as any, git, bus, config })
+
+const coordinator = new PermissionCoordinator(db, judge, config, bus, orchestrator)
+const runner = new ClaudeAgentRunner(coordinator)
+
+// Patch runner into orchestrator deps
+;(orchestrator as any).deps.runner = runner
+;(orchestrator as any).deps.coordinator = coordinator
+
 orchestrator.recoverFromCrash()
 orchestrator.start()
 
@@ -21,6 +39,7 @@ const app = createApp({
   db,
   bus,
   git,
+  coordinator,
   onStopTask: (taskId) => orchestrator.abortTask(taskId),
 })
 
