@@ -8,6 +8,10 @@ test('FakeAIRunner.execute returns the queued result and records the call', asyn
     prompt: 'do it',
     cwd: '/tmp',
     signal: new AbortController().signal,
+    taskId: 1,
+    runId: 1,
+    taskTitle: 'T',
+    taskDescription: '',
   })
   expect(result).toEqual({ summary: 'done' })
   expect(runner.executorCalls).toHaveLength(1)
@@ -21,6 +25,10 @@ test('FakeAIRunner.review returns the queued verdict', async () => {
     prompt: 'review',
     cwd: '/tmp',
     signal: new AbortController().signal,
+    taskId: 1,
+    runId: 1,
+    taskTitle: 'T',
+    taskDescription: '',
   })
   expect(result).toEqual({ verdict: 'rejected', summary: 'no good' })
 })
@@ -31,7 +39,7 @@ test('FakeAIRunner rejects with AbortError if the signal is pre-aborted', async 
   const controller = new AbortController()
   controller.abort('user_abort')
   await expect(
-    runner.execute({ prompt: 'x', cwd: '/tmp', signal: controller.signal }),
+    runner.execute({ prompt: 'x', cwd: '/tmp', signal: controller.signal, taskId: 1, runId: 1, taskTitle: 'T', taskDescription: '' }),
   ).rejects.toThrow()
 })
 
@@ -42,6 +50,10 @@ test('FakeAIRunner throws when the queue is empty', async () => {
       prompt: 'x',
       cwd: '/tmp',
       signal: new AbortController().signal,
+      taskId: 1,
+      runId: 1,
+      taskTitle: 'T',
+      taskDescription: '',
     }),
   ).rejects.toThrow('no queued executor result')
 })
