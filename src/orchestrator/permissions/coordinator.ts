@@ -140,7 +140,7 @@ export class PermissionCoordinator {
         decidedAt: Date.now(),
       })
       .where(and(eq(approvals.id, approvalId), eq(approvals.status, 'pending')))
-      .run()
+      .run() as unknown as { changes: number }
 
     if (result.changes === 0) {
       throw new Error('approval is not pending')
