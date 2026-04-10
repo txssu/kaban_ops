@@ -2,6 +2,7 @@ export const TASK_COLUMNS = [
   'backlog',
   'todo',
   'progress',
+  'awaiting_approval',
   'ai_review',
   'ai_review_in_progress',
   'human_review',
@@ -59,6 +60,7 @@ export interface Task {
   attemptsCount: number
   branchName: string | null
   worktreePath: string | null
+  awaitingReturnColumn: TaskColumn | null
   lastFailureReason: FailureReason | null
   createdAt: number
   updatedAt: number
@@ -66,6 +68,28 @@ export interface Task {
 
 export interface TaskWithRun extends Task {
   activeRunStartedAt: number | null
+}
+
+export type JudgeMode = 'advisory' | 'enforcing'
+export type JudgeVerdictType = 'safe' | 'dangerous' | 'ask_human'
+export type ApprovalStatus = 'pending' | 'approved' | 'denied'
+export type ApprovalDecision = 'allow_once' | 'allow_for_task' | 'deny'
+export type ApprovalDecidedBy = 'human' | 'judge' | 'hardcoded' | 'system'
+
+export interface Approval {
+  id: number
+  taskId: number
+  runId: number
+  toolName: string
+  toolInput: string
+  toolInputHash: string
+  judgeVerdict: JudgeVerdictType | null
+  judgeReason: string | null
+  status: ApprovalStatus
+  decision: ApprovalDecision | null
+  decidedBy: ApprovalDecidedBy | null
+  createdAt: number
+  decidedAt: number | null
 }
 
 export interface Run {
