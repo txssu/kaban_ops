@@ -66,28 +66,36 @@ function hasRecursiveFlag(args: string[]): boolean {
   return false
 }
 
-type ParsedToken = string | { op: string }
-
 interface Segment {
   tokens: string[]
   redirectTargets: string[]
 }
 
-function splitSegments(parsed: ParsedToken[]): { segments: Segment[]; pipes: Array<{ left: Segment; right: Segment }> } {
+function getOp(entry: ParseEntry): string | null {
+  if (typeof entry === 'object' && entry !== null && 'op' in entry) {
+    return (entry as { op: string }).op
+  }
+  return null
+}
+
+function splitSegments(parsed: ParseEntry[]): { segments: Segment[]; pipes: Array<{ left: Segment; right: Segment }> } {
   const segments: Segment[] = []
   const pipes: Array<{ left: Segment; right: Segment }> = []
   let current: Segment = { tokens: [], redirectTargets: [] }
 
   let i = 0
   while (i < parsed.length) {
-    const token = parsed[i]
-    if (typeof token !== 'string') {
-      const op = token.op
+    const token = parsed[i]!
+    if (typeof token === 'string') {
+      current.tokens.push(token)
+    } else {
+      const op = getOp(token)
       if (op === '>' || op === '>>') {
         // Next token is the redirect target
         i++
-        if (i < parsed.length && typeof parsed[i] === 'string') {
-          current.redirectTargets.push(parsed[i] as string)
+        const next = parsed[i]
+        if (i < parsed.length && typeof next === 'string') {
+          current.redirectTargets.push(next)
         }
       } else if (op === '&&' || op === '||' || op === ';') {
         segments.push(current)
@@ -96,25 +104,23 @@ function splitSegments(parsed: ParsedToken[]): { segments: Segment[]; pipes: Arr
         segments.push(current)
         const leftSegment = current
         current = { tokens: [], redirectTargets: [] }
-        // We'll record the pipe relationship after we finish the next segment
-        // For now, push to segments and track pipe connections
-        // Actually, let's track pipes separately
-        // We need to peek ahead to get the right segment
         i++
         // Collect the right segment
         while (i < parsed.length) {
-          const t = parsed[i]
-          if (typeof t !== 'string') {
-            if (t.op === '>' || t.op === '>>') {
+          const t = parsed[i]!
+          if (typeof t === 'string') {
+            current.tokens.push(t)
+          } else {
+            const innerOp = getOp(t)
+            if (innerOp === '>' || innerOp === '>>') {
               i++
-              if (i < parsed.length && typeof parsed[i] === 'string') {
-                current.redirectTargets.push(parsed[i] as string)
+              const next = parsed[i]
+              if (i < parsed.length && typeof next === 'string') {
+                current.redirectTargets.push(next)
               }
             } else {
               break
             }
-          } else {
-            current.tokens.push(t)
           }
           i++
         }
@@ -123,8 +129,7 @@ function splitSegments(parsed: ParsedToken[]): { segments: Segment[]; pipes: Arr
         current = { tokens: [], redirectTargets: [] }
         continue // skip the i++ at end
       }
-    } else {
-      current.tokens.push(token)
+      // Skip comment entries or other non-op objects silently
     }
     i++
   }
@@ -140,7 +145,7 @@ function stripEnvPrefix(tokens: string[]): string[] {
   if (tokens[0] === 'env') {
     // Skip 'env' and any VAR=val tokens
     let i = 1
-    while (i < tokens.length && tokens[i].includes('=')) {
+    while (i < tokens.length && tokens[i]!.includes('=')) {
       i++
     }
     return tokens.slice(i)
@@ -155,7 +160,7 @@ function classifySegment(tokens: string[], redirectTargets: string[], worktreePa
   tokens = stripEnvPrefix(tokens)
   if (tokens.length === 0) return 'allow'
 
-  const cmd = tokens[0]
+  const cmd = tokens[0]!
   const args = tokens.slice(1)
 
   // --- DENY checks first ---
@@ -168,7 +173,7 @@ function classifySegment(tokens: string[], redirectTargets: string[], worktreePa
 
   // git dangerous operations
   if (cmd === 'git' && args.length > 0) {
-    const subCmd = args[0]
+    const subCmd = args[0]!
     if (subCmd === 'push') return 'deny'
     if (subCmd === 'clean') return 'deny'
     if (subCmd === 'reset' && args.includes('--hard')) return 'deny'
@@ -197,8 +202,9 @@ function classifySegment(tokens: string[], redirectTargets: string[], worktreePa
   // bun test, bun run
   if (cmd === 'bun') {
     if (args.length === 0) return 'grey'
-    if (args[0] === 'test' || args[0] === 'run') return 'allow'
-    if (args[0] === 'install' && args.length === 1) return 'allow'
+    const sub = args[0]!
+    if (sub === 'test' || sub === 'run') return 'allow'
+    if (sub === 'install' && args.length === 1) return 'allow'
     // bun add, bun remove, bun install <pkg> → grey
     return 'grey'
   }
@@ -209,7 +215,7 @@ function classifySegment(tokens: string[], redirectTargets: string[], worktreePa
   // git safe subcommands
   if (cmd === 'git') {
     if (args.length === 0) return 'grey'
-    const subCmd = args[0]
+    const subCmd = args[0]!
     if (SAFE_GIT_SUBCOMMANDS.has(subCmd)) return 'allow'
     return 'grey'
   }
@@ -230,7 +236,7 @@ function classifySegment(tokens: string[], redirectTargets: string[], worktreePa
   // cd — must stay in worktree
   if (cmd === 'cd') {
     if (args.length === 0) return 'grey'
-    const target = args[0]
+    const target = args[0]!
     const resolved = resolve(worktreePath, target)
     if (isWithin(resolved, worktreePath)) return 'allow'
     return 'grey'
