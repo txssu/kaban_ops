@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   attempts_count INTEGER NOT NULL DEFAULT 0,
   branch_name TEXT,
   worktree_path TEXT,
+  awaiting_return_column TEXT,
   last_failure_reason TEXT,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
@@ -47,6 +48,24 @@ CREATE TABLE IF NOT EXISTS runs (
 );
 
 CREATE INDEX IF NOT EXISTS runs_by_task ON runs(task_id, started_at);
+
+CREATE TABLE IF NOT EXISTS approvals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  run_id INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  tool_name TEXT NOT NULL,
+  tool_input TEXT NOT NULL,
+  tool_input_hash TEXT NOT NULL,
+  judge_verdict TEXT,
+  judge_reason TEXT,
+  status TEXT NOT NULL,
+  decision TEXT,
+  decided_by TEXT,
+  created_at INTEGER NOT NULL,
+  decided_at INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS approvals_by_task_status ON approvals(task_id, status);
 `
 
 export function applySchema(sqlite: Database): void {

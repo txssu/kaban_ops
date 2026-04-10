@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
-import { eq, sql, desc } from 'drizzle-orm'
+import { eq, and, sql, desc } from 'drizzle-orm'
 import { z } from 'zod'
-import { tasks, runs } from '../../db/schema'
+import { tasks, runs, approvals } from '../../db/schema'
 import type { Db } from '../../db/client'
 import type { SseBus } from '../sse-bus'
 import type { Task, TaskColumn } from '../../shared/types'
@@ -48,10 +48,34 @@ export function createTaskRoutes(deps: {
       .all()
 
     return c.json(
-      rows.map((r) => ({
-        ...r.task,
-        activeRunStartedAt: r.activeRunStartedAt ?? null,
-      })),
+      rows.map((r) => {
+        const task = {
+          ...r.task,
+          activeRunStartedAt: r.activeRunStartedAt ?? null,
+        } as Record<string, unknown>
+        if (r.task.column === 'awaiting_approval') {
+          const [pending] = deps.db
+            .select()
+            .from(approvals)
+            .where(
+              and(
+                eq(approvals.taskId, r.task.id),
+                eq(approvals.status, 'pending'),
+              ),
+            )
+            .all()
+          if (pending) {
+            task.pendingApproval = {
+              id: pending.id,
+              toolName: pending.toolName,
+              toolInputPreview: pending.toolInput.slice(0, 500),
+              judgeVerdict: pending.judgeVerdict,
+              judgeReason: pending.judgeReason,
+            }
+          }
+        }
+        return task
+      }),
     )
   })
 

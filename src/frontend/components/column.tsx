@@ -2,11 +2,13 @@ import { useDroppable } from '@dnd-kit/core'
 import type { TaskColumn, TaskWithRun } from '../../shared/types'
 import { MANUAL_COLUMNS } from '../../shared/types'
 import { TaskCard } from './task-card'
+import { ApprovalCard } from './approval-card'
 
 const LABELS: Record<TaskColumn, string> = {
   backlog: 'BACKLOG',
   todo: 'TODO',
   progress: 'PROGRESS',
+  awaiting_approval: 'AWAITING APPROVAL',
   ai_review: 'AI REVIEW',
   ai_review_in_progress: 'AI REVIEW IN PROGRESS',
   human_review: 'HUMAN REVIEW',
@@ -38,7 +40,11 @@ export function Column({
     <div
       ref={setNodeRef}
       className={`flex flex-col min-w-[280px] max-w-[280px] rounded-lg p-3 ${
-        isOver ? 'bg-slate-200 dark:bg-slate-700' : 'bg-slate-100 dark:bg-slate-800/50'
+        column === 'awaiting_approval'
+          ? 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800'
+          : isOver
+            ? 'bg-slate-200 dark:bg-slate-700'
+            : 'bg-slate-100 dark:bg-slate-800/50'
       }`}
       data-testid={`column-${column}`}
     >
@@ -53,14 +59,18 @@ export function Column({
         )}
       </div>
       <div className="flex-1 overflow-y-auto">
-        {tasks.map((t) => (
-          <TaskCard
-            key={t.id}
-            task={t}
-            onOpen={onOpenTask}
-            maxAttempts={maxAttempts}
-          />
-        ))}
+        {tasks.map((t) =>
+          t.column === 'awaiting_approval' ? (
+            <ApprovalCard key={t.id} task={t as any} />
+          ) : (
+            <TaskCard
+              key={t.id}
+              task={t}
+              onOpen={onOpenTask}
+              maxAttempts={maxAttempts}
+            />
+          ),
+        )}
       </div>
     </div>
   )

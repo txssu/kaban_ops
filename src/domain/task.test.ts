@@ -20,6 +20,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     attemptsCount: 0,
     branchName: null,
     worktreePath: null,
+    awaitingReturnColumn: null,
     lastFailureReason: null,
     createdAt: 1,
     updatedAt: 1,
@@ -101,4 +102,20 @@ test('clearFailureOnReopen also clears on human_review to backlog', () => {
 test('clearFailureOnReopen returns empty patch for non-reopening moves', () => {
   const task = makeTask({ column: 'human_review', attemptsCount: 2 })
   expect(clearFailureOnReopen(task, 'done')).toEqual({})
+})
+
+test('awaiting_approval is not active', () => {
+  expect(isActiveColumn('awaiting_approval')).toBe(false)
+})
+
+test('awaiting_approval is not manual', () => {
+  expect(isManualColumn('awaiting_approval')).toBe(false)
+})
+
+test('canEditTask returns false for awaiting_approval', () => {
+  expect(canEditTask(makeTask({ column: 'awaiting_approval' }))).toBe(false)
+})
+
+test('canDeleteTask returns false for awaiting_approval', () => {
+  expect(canDeleteTask(makeTask({ column: 'awaiting_approval' }))).toBe(false)
 })
