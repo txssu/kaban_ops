@@ -23,6 +23,7 @@ export const tasks = sqliteTable(
     attemptsCount: integer('attempts_count').notNull().default(0),
     branchName: text('branch_name'),
     worktreePath: text('worktree_path'),
+    awaitingReturnColumn: text('awaiting_return_column'),
     lastFailureReason: text('last_failure_reason'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
@@ -46,4 +47,28 @@ export const runs = sqliteTable(
     endedAt: integer('ended_at'),
   },
   (t) => [index('runs_by_task').on(t.taskId, t.startedAt)],
+)
+
+export const approvals = sqliteTable(
+  'approvals',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    taskId: integer('task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'cascade' }),
+    runId: integer('run_id')
+      .notNull()
+      .references(() => runs.id, { onDelete: 'cascade' }),
+    toolName: text('tool_name').notNull(),
+    toolInput: text('tool_input').notNull(),
+    toolInputHash: text('tool_input_hash').notNull(),
+    judgeVerdict: text('judge_verdict'),
+    judgeReason: text('judge_reason'),
+    status: text('status').notNull(),
+    decision: text('decision'),
+    decidedBy: text('decided_by'),
+    createdAt: integer('created_at').notNull(),
+    decidedAt: integer('decided_at'),
+  },
+  (t) => [index('approvals_by_task_status').on(t.taskId, t.status)],
 )

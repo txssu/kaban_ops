@@ -18,10 +18,12 @@ export function canManuallyMove(
 }
 
 export function canEditTask(task: Task): boolean {
+  if (task.column === 'awaiting_approval') return false
   return !isActiveColumn(task.column)
 }
 
 export function canDeleteTask(task: Task): boolean {
+  if (task.column === 'awaiting_approval') return false
   return !isActiveColumn(task.column)
 }
 
