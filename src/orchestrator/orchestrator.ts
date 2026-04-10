@@ -6,6 +6,8 @@ import type { GitClient } from './git-client'
 import type { SseBus, SseEvent } from '../server/sse-bus'
 import { buildExecutorPrompt, buildReviewerPrompt } from './prompts'
 import type { FailureReason, TaskColumn } from '../shared/types'
+import type { PermissionCoordinator } from './permissions/coordinator'
+import type { OrchestratorSlotHooks } from './permissions/coordinator'
 
 export interface OrchestratorConfig {
   progressLimit: number
@@ -29,13 +31,23 @@ export interface OrchestratorDeps {
   git: GitClient
   bus: SseBus
   config: OrchestratorConfig
+  coordinator?: PermissionCoordinator
 }
 
-export class Orchestrator {
+export class Orchestrator implements OrchestratorSlotHooks {
   private readonly active = new Map<number, ActiveRun>()
+  private readonly paused = new Set<number>()
   private interval: ReturnType<typeof setInterval> | null = null
 
   constructor(private readonly deps: OrchestratorDeps) {}
+
+  releaseSlot(taskId: number): void {
+    this.paused.add(taskId)
+  }
+
+  reacquireSlot(taskId: number): void {
+    this.paused.delete(taskId)
+  }
 
   start(tickMs: number = 500): void {
     if (this.interval) return
@@ -72,9 +84,9 @@ export class Orchestrator {
       }
     }
 
-    // 2. Fill executor slots
+    // 2. Fill executor slots (exclude paused tasks)
     let execBusy = Array.from(this.active.values()).filter(
-      (r) => r.kind === 'executor',
+      (r) => r.kind === 'executor' && !this.paused.has(r.taskId),
     ).length
     while (execBusy < this.deps.config.progressLimit) {
       const task = this.pullNext('todo', 'progress')
@@ -83,9 +95,9 @@ export class Orchestrator {
       execBusy += 1
     }
 
-    // 3. Fill reviewer slots
+    // 3. Fill reviewer slots (exclude paused tasks)
     let revBusy = Array.from(this.active.values()).filter(
-      (r) => r.kind === 'reviewer',
+      (r) => r.kind === 'reviewer' && !this.paused.has(r.taskId),
     ).length
     while (revBusy < this.deps.config.aiReviewLimit) {
       const task = this.pullNext('ai_review', 'ai_review_in_progress')
@@ -96,6 +108,9 @@ export class Orchestrator {
   }
 
   recoverFromCrash(): void {
+    // Recover pending approvals first
+    this.deps.coordinator?.recoverPendingApprovals()
+
     const orphaned = this.deps.db
       .select()
       .from(tasks)
@@ -176,6 +191,8 @@ export class Orchestrator {
     const startedAt = Date.now()
     const promise = this.runExecutor(taskId, controller).finally(() => {
       this.active.delete(taskId)
+      this.paused.delete(taskId)
+      this.deps.coordinator?.clearTaskState(taskId)
     })
     this.active.set(taskId, {
       taskId,
@@ -243,6 +260,10 @@ export class Orchestrator {
         prompt,
         cwd: refreshedTask.worktreePath!,
         signal: controller.signal,
+        taskId,
+        runId: runId!,
+        taskTitle: refreshedTask.title,
+        taskDescription: refreshedTask.description,
       })
 
       this.deps.db
@@ -288,6 +309,8 @@ export class Orchestrator {
     const startedAt = Date.now()
     const promise = this.runReviewer(taskId, controller).finally(() => {
       this.active.delete(taskId)
+      this.paused.delete(taskId)
+      this.deps.coordinator?.clearTaskState(taskId)
     })
     this.active.set(taskId, {
       taskId,
@@ -340,6 +363,10 @@ export class Orchestrator {
         prompt,
         cwd: task.worktreePath!,
         signal: controller.signal,
+        taskId,
+        runId: runId!,
+        taskTitle: task.title,
+        taskDescription: task.description,
       })
 
       this.deps.db

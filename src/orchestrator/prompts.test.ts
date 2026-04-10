@@ -12,6 +12,7 @@ const baseTask: Task = {
   attemptsCount: 1,
   branchName: 'kaban/task-42',
   worktreePath: '/tmp/wt/task-42',
+  awaitingReturnColumn: null,
   lastFailureReason: null,
   createdAt: 1,
   updatedAt: 1,
