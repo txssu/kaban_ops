@@ -79,6 +79,7 @@ export class Orchestrator {
     while (execBusy < this.deps.config.progressLimit) {
       const task = this.pullNext('todo', 'progress')
       if (!task) break
+      this.publish({ type: 'task.updated', payload: { taskId: task.id } })
       this.startExecutor(task.id)
       execBusy += 1
     }
@@ -90,6 +91,7 @@ export class Orchestrator {
     while (revBusy < this.deps.config.aiReviewLimit) {
       const task = this.pullNext('ai_review', 'ai_review_in_progress')
       if (!task) break
+      this.publish({ type: 'task.updated', payload: { taskId: task.id } })
       this.startReviewer(task.id)
       revBusy += 1
     }
