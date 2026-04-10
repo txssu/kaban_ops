@@ -15,7 +15,7 @@ export interface PermissionContext {
 }
 
 export type PermissionDecision =
-  | { behavior: 'allow' }
+  | { behavior: 'allow'; updatedInput: Record<string, unknown> }
   | { behavior: 'deny'; message: string }
 
 export interface OrchestratorSlotHooks {
@@ -66,7 +66,7 @@ export class PermissionCoordinator {
   async evaluate(
     ctx: PermissionContext,
     toolName: string,
-    toolInput: unknown,
+    toolInput: Record<string, unknown>,
     signal: AbortSignal,
   ): Promise<PermissionDecision> {
     // Layer 1: Hardcoded deny
@@ -78,13 +78,13 @@ export class PermissionCoordinator {
 
     // Layer 2: Hardcoded allow
     if (ruleResult.decision === 'allow') {
-      return { behavior: 'allow' }
+      return { behavior: 'allow', updatedInput: toolInput }
     }
 
     // Layer 3: Task allowlist
     const hash = computeHash(toolName, toolInput)
     if (this.taskAllowlists.get(ctx.taskId)?.has(hash)) {
-      return { behavior: 'allow' }
+      return { behavior: 'allow', updatedInput: toolInput }
     }
 
     // Layer 4: Judge (with cache)
@@ -114,7 +114,7 @@ export class PermissionCoordinator {
     // Enforcing mode auto-decisions
     if (mode === 'enforcing' && verdict.verdict === 'safe') {
       this.logApproval(ctx, toolName, toolInput, verdict, 'approved', null, 'judge')
-      return { behavior: 'allow' }
+      return { behavior: 'allow', updatedInput: toolInput }
     }
     if (mode === 'enforcing' && verdict.verdict === 'dangerous') {
       this.logApproval(ctx, toolName, toolInput, verdict, 'denied', null, 'judge')
@@ -188,7 +188,8 @@ export class PermissionCoordinator {
       if (decision === 'deny') {
         deferred.resolve({ behavior: 'deny', message: 'denied by user' })
       } else {
-        deferred.resolve({ behavior: 'allow' })
+        const parsedInput = JSON.parse(approval.toolInput) as Record<string, unknown>
+        deferred.resolve({ behavior: 'allow', updatedInput: parsedInput })
       }
       this.pending.delete(approvalId)
     }

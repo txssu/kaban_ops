@@ -78,7 +78,7 @@ export class ClaudeAgentRunner implements AIRunner {
           cwd: input.cwd,
           abortController: controller,
           permissionMode: 'default',
-          canUseTool: async (toolName: string, toolInput: unknown) => {
+          canUseTool: async (toolName: string, toolInput: Record<string, unknown>) => {
             return this.coordinator.evaluate(
               ctx,
               toolName,
@@ -93,6 +93,7 @@ export class ClaudeAgentRunner implements AIRunner {
 
       let finalText = ''
       for await (const msg of q) {
+        console.log(`[agent task-${input.taskId}]`, JSON.stringify(msg))
         if (msg.type === 'result') {
           if (msg.subtype === 'success') {
             finalText = msg.result
