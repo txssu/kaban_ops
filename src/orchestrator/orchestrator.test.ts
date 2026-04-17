@@ -4,7 +4,7 @@ import { makeDb } from '../../tests/helpers/in-memory-db'
 import { repositories, tasks, runs } from '../db/schema'
 import { Orchestrator } from './orchestrator'
 import { FakeAIRunner } from './runner'
-import { SseBus } from '../server/sse-bus'
+import { SseBus, type SseEvent } from '../server/sse-bus'
 import type { GitClient } from './git-client'
 
 class StubGitClient implements GitClient {
@@ -319,4 +319,126 @@ test('recoverFromCrash moves orphaned active tasks to HUMAN_REVIEW with error', 
   const after = db.select().from(tasks).all()
   expect(after.every((t) => t.column === 'human_review')).toBe(true)
   expect(after.every((t) => t.lastFailureReason === 'error')).toBe(true)
+})
+
+test('tick() publishes task.updated when pulling from TODO to PROGRESS', async () => {
+  const db = makeDb()
+  const repo = seedRepo(db)
+  const task = insertTask(db, repo.id, { title: 'x', position: 0 })
+
+  const bus = new SseBus()
+  const events: SseEvent[] = []
+  bus.subscribe((e) => events.push(e))
+
+  const runner = new FakeAIRunner()
+  // Block the executor so it never completes and emits its own task.updated.
+  let startResolved!: () => void
+  const started = new Promise<void>((r) => (startResolved = r))
+  runner.execute = async (input) => {
+    startResolved()
+    await new Promise<void>((_, reject) => {
+      input.signal.addEventListener('abort', () => {
+        const err = new Error('aborted')
+        err.name = 'AbortError'
+        reject(err)
+      })
+    })
+    return { summary: 'unused' }
+  }
+  const git = new StubGitClient()
+  const orch = makeOrchestrator({ db, runner, git, bus })
+
+  await orch.tick()
+  await started
+
+  expect(events).toEqual([
+    { type: 'task.updated', payload: { taskId: task.id } },
+  ])
+
+  orch.abortTask(task.id)
+  await orch.drain()
+})
+
+test('tick() publishes task.updated when pulling from AI_REVIEW to AI_REVIEW_IN_PROGRESS', async () => {
+  const db = makeDb()
+  const repo = seedRepo(db)
+  const task = insertTask(db, repo.id, {
+    title: 'x',
+    column: 'ai_review',
+    position: 0,
+    branchName: 'kaban/task-1',
+    worktreePath: '/tmp/wt/task-1',
+  })
+  db.insert(runs)
+    .values({
+      taskId: task.id,
+      kind: 'executor',
+      status: 'succeeded',
+      summary: 'did it',
+      startedAt: 1,
+      endedAt: 2,
+    })
+    .run()
+
+  const bus = new SseBus()
+  const events: SseEvent[] = []
+  bus.subscribe((e) => events.push(e))
+
+  const runner = new FakeAIRunner()
+  // Block the reviewer so it never completes and emits its own task.updated.
+  let startResolved!: () => void
+  const started = new Promise<void>((r) => (startResolved = r))
+  runner.review = async (input) => {
+    startResolved()
+    await new Promise<void>((_, reject) => {
+      input.signal.addEventListener('abort', () => {
+        const err = new Error('aborted')
+        err.name = 'AbortError'
+        reject(err)
+      })
+    })
+    return { verdict: 'approved', summary: 'unused' }
+  }
+  const git = new StubGitClient()
+  const orch = makeOrchestrator({ db, runner, git, bus })
+
+  await orch.tick()
+  await started
+
+  expect(events).toEqual([
+    { type: 'task.updated', payload: { taskId: task.id } },
+  ])
+
+  orch.abortTask(task.id)
+  await orch.drain()
+})
+
+test('recoverFromCrash publishes task.updated for each recovered task', () => {
+  const db = makeDb()
+  const repo = seedRepo(db)
+  const a = insertTask(db, repo.id, {
+    title: 'a',
+    column: 'progress',
+    position: 0,
+  })
+  const b = insertTask(db, repo.id, {
+    title: 'b',
+    column: 'ai_review_in_progress',
+    position: 0,
+  })
+
+  const bus = new SseBus()
+  const events: SseEvent[] = []
+  bus.subscribe((e) => events.push(e))
+
+  const runner = new FakeAIRunner()
+  const git = new StubGitClient()
+  const orch = makeOrchestrator({ db, runner, git, bus })
+  orch.recoverFromCrash()
+
+  const ids = events
+    .filter((e) => e.type === 'task.updated')
+    .map((e) => e.payload.taskId)
+    .sort((x, y) => x - y)
+  expect(ids).toEqual([a.id, b.id].sort((x, y) => x - y))
 })
