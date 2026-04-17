@@ -126,11 +126,12 @@ export class Orchestrator {
           endedAt: Date.now(),
         })
         .run()
+      this.publish({ type: 'task.updated', payload: { taskId: task.id } })
     }
   }
 
   private pullNext(from: TaskColumn, to: TaskColumn) {
-    return this.deps.db.transaction((tx) => {
+    const result = this.deps.db.transaction((tx) => {
       const [candidate] = tx
         .select()
         .from(tasks)
@@ -146,6 +147,10 @@ export class Orchestrator {
         .run()
       return { ...candidate, column: to, position }
     })
+    if (result) {
+      this.publish({ type: 'task.updated', payload: { taskId: result.id } })
+    }
+    return result
   }
 
   private nextPosition(col: TaskColumn): number {
