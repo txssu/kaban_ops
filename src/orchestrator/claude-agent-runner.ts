@@ -93,7 +93,6 @@ export class ClaudeAgentRunner implements AIRunner {
 
       let finalText = ''
       for await (const msg of q) {
-        console.log(`[agent task-${input.taskId}]`, JSON.stringify(msg))
         if (msg.type === 'result') {
           if (msg.subtype === 'success') {
             finalText = msg.result
