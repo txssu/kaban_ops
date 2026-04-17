@@ -11,6 +11,8 @@ import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { api } from '../api'
 import { useApprovalDecide } from '../hooks/use-approvals'
+import { VERDICT_COLORS } from '../lib/verdict'
+import { ApprovalToolInput } from './approval-tool-input'
 
 interface ApprovalDetailDialogProps {
   approvalId: number
@@ -32,13 +34,6 @@ export function ApprovalDetailDialog({
 
   if (!approval) return null
 
-  let formattedInput: string
-  try {
-    formattedInput = JSON.stringify(JSON.parse(approval.toolInput), null, 2)
-  } catch {
-    formattedInput = approval.toolInput
-  }
-
   function handleDecide(
     decision: 'allow_once' | 'allow_for_task' | 'deny',
   ) {
@@ -50,55 +45,58 @@ export function ApprovalDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg flex flex-col">
+      <DialogContent className="max-w-lg flex flex-col gap-5">
         <DialogHeader className="shrink-0">
-          <DialogTitle>Approval Request</DialogTitle>
+          <DialogTitle>Approval request</DialogTitle>
           <DialogDescription>
             The agent wants to use <strong>{approval.toolName}</strong>.
-            Review the details below and decide.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-3 min-h-0">
-          <div className="flex items-center gap-2">
+        <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
+          <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">{approval.toolName}</Badge>
             {approval.judgeVerdict && (
-              <Badge variant="secondary">
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  VERDICT_COLORS[approval.judgeVerdict] ?? ''
+                }`}
+              >
                 Haiku: {approval.judgeVerdict}
-              </Badge>
+              </span>
             )}
           </div>
 
           {approval.judgeReason && (
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
               {approval.judgeReason}
             </p>
           )}
 
-          <pre className="whitespace-pre-wrap text-sm rounded bg-slate-50 p-3 dark:bg-slate-900 overflow-x-auto break-all">
-            {formattedInput}
-          </pre>
+          <ApprovalToolInput
+            toolName={approval.toolName}
+            toolInput={approval.toolInput}
+          />
         </div>
 
-        <DialogFooter className="shrink-0">
-          <Button
-            variant="outline"
-            onClick={() => handleDecide('allow_once')}
-          >
-            Allow once
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => handleDecide('allow_for_task')}
-          >
-            Allow for task
-          </Button>
+        <DialogFooter className="shrink-0 sm:justify-between">
           <Button
             variant="destructive"
             onClick={() => handleDecide('deny')}
           >
             Deny
           </Button>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={() => handleDecide('allow_once')}
+            >
+              Allow once
+            </Button>
+            <Button onClick={() => handleDecide('allow_for_task')}>
+              Allow for task
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

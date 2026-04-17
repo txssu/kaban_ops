@@ -4,6 +4,7 @@ import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { useApprovalDecide } from '../hooks/use-approvals'
 import { ApprovalDetailDialog } from './approval-detail-dialog'
+import { VERDICT_COLORS } from '../lib/verdict'
 import type { TaskWithRun } from '../../shared/types'
 
 interface PendingApproval {
@@ -16,13 +17,6 @@ interface PendingApproval {
 
 interface ApprovalCardProps {
   task: TaskWithRun & { pendingApproval?: PendingApproval }
-}
-
-const VERDICT_COLORS: Record<string, string> = {
-  safe: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  dangerous: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-  ask_human:
-    'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
 }
 
 function toolPreview(toolName: string, preview: string): string {
