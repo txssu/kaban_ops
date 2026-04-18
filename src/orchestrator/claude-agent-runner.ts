@@ -6,6 +6,7 @@ import type {
   ExecutorResult,
   ReviewerResult,
 } from './runner'
+import type { PermissionCoordinator, PermissionContext } from './permissions/coordinator'
 
 const reviewerSchema = z.object({
   verdict: z.enum(['approved', 'rejected']),
@@ -28,6 +29,8 @@ The "summary" field must contain your full markdown explanation.
 `
 
 export class ClaudeAgentRunner implements AIRunner {
+  constructor(private coordinator: PermissionCoordinator) {}
+
   async execute(input: AIRunnerInput): Promise<ExecutorResult> {
     const finalText = await this.runQuery(input.prompt, input)
     return { summary: finalText }
@@ -60,14 +63,29 @@ export class ClaudeAgentRunner implements AIRunner {
       input.signal.addEventListener('abort', onAbort, { once: true })
     }
 
+    const ctx: PermissionContext = {
+      taskId: input.taskId,
+      runId: input.runId,
+      worktreePath: input.cwd,
+      taskTitle: input.taskTitle,
+      taskDescription: input.taskDescription,
+    }
+
     try {
       const q = query({
         prompt,
         options: {
           cwd: input.cwd,
           abortController: controller,
-          permissionMode: 'bypassPermissions',
-          allowDangerouslySkipPermissions: true,
+          permissionMode: 'default',
+          canUseTool: async (toolName: string, toolInput: Record<string, unknown>) => {
+            return this.coordinator.evaluate(
+              ctx,
+              toolName,
+              toolInput,
+              controller.signal,
+            )
+          },
           systemPrompt: { type: 'preset', preset: 'claude_code' },
           settingSources: ['user', 'project', 'local'],
         },

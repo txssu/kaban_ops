@@ -14,6 +14,8 @@ export function useTaskEvents() {
     source.addEventListener('task.deleted', invalidateTasks)
     source.addEventListener('repository.created', invalidateRepos)
     source.addEventListener('repository.deleted', invalidateRepos)
+    source.addEventListener('approval.pending', invalidateTasks)
+    source.addEventListener('approval.resolved', invalidateTasks)
     return () => source.close()
   }, [qc])
 }

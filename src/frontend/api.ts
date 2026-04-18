@@ -4,6 +4,8 @@ import type {
   TaskColumn,
   TaskWithRun,
   Run,
+  Approval,
+  ApprovalDecision,
 } from '../shared/types'
 
 async function json<T>(res: Response): Promise<T> {
@@ -65,6 +67,22 @@ export const api = {
 
   async listRepositories(): Promise<Repository[]> {
     return json(await fetch('/api/repositories'))
+  },
+
+  async getApproval(id: number): Promise<Approval> {
+    return json(await fetch(`/api/approvals/${id}`))
+  },
+
+  async decideApproval(
+    id: number,
+    decision: ApprovalDecision,
+  ): Promise<void> {
+    const res = await fetch(`/api/approvals/${id}/decide`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ decision }),
+    })
+    if (!res.ok) throw new Error(await res.text())
   },
 
   async createRepository(input: {
