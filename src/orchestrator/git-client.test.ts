@@ -59,6 +59,7 @@ test('createWorktree branches from origin/<default_branch> and places worktree i
       localPath: info.localPath,
       defaultBranch: info.defaultBranch,
       taskId: 7,
+      branch: 'kaban/alice/abcd1234/task-7',
     })
 
     expect(worktreePath).toBe(join(worktreesDir, 'task-7'))
@@ -82,14 +83,17 @@ test('removeWorktree deletes the worktree directory and branch', async () => {
       name: 'work',
       url: pair.bareDir,
     })
+    const branch = 'kaban/alice/abcd1234/task-11'
     const worktreePath = await client.createWorktree({
       localPath: info.localPath,
       defaultBranch: info.defaultBranch,
       taskId: 11,
+      branch,
     })
     await client.removeWorktree({
       localPath: info.localPath,
       taskId: 11,
+      branch,
     })
 
     expect(existsSync(worktreePath)).toBe(false)

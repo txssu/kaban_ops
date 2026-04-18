@@ -16,10 +16,19 @@ class StubGit implements GitClient {
     }
   }
   async fetchRepository() {}
-  async createWorktree() {
+  async createWorktree(_input: {
+    localPath: string
+    defaultBranch: string
+    taskId: number
+    branch: string
+  }) {
     return '/tmp/wt'
   }
-  async removeWorktree() {}
+  async removeWorktree(_input: {
+    localPath: string
+    taskId: number
+    branch: string
+  }) {}
 }
 
 test('POST /api/repositories clones and stores the repo', async () => {

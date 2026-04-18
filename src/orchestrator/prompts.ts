@@ -11,8 +11,11 @@ export function buildExecutorPrompt({
   defaultBranch,
   previousRuns,
 }: ExecutorInput): string {
-  const branch = task.branchName ?? `kaban/task-${task.id}`
-  const worktree = task.worktreePath ?? '<worktree not yet created>'
+  if (!task.branchName || !task.worktreePath) {
+    throw new Error(`task ${task.id} has no branch/worktree yet`)
+  }
+  const branch = task.branchName
+  const worktree = task.worktreePath
 
   const attempts = renderPreviousAttempts(previousRuns)
 
@@ -87,8 +90,11 @@ export function buildReviewerPrompt({
   defaultBranch,
   latestExecutorRun,
 }: ReviewerInput): string {
-  const branch = task.branchName ?? `kaban/task-${task.id}`
-  const worktree = task.worktreePath ?? '<worktree not yet created>'
+  if (!task.branchName || !task.worktreePath) {
+    throw new Error(`task ${task.id} has no branch/worktree yet`)
+  }
+  const branch = task.branchName
+  const worktree = task.worktreePath
 
   return `You are a code reviewer agent.
 

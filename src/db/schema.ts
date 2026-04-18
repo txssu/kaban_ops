@@ -1,5 +1,10 @@
 import { sqliteTable, integer, text, index } from 'drizzle-orm/sqlite-core'
 
+export const meta = sqliteTable('meta', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+})
+
 export const repositories = sqliteTable('repositories', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull().unique(),
