@@ -14,6 +14,16 @@ export interface OrchestratorConfig {
   aiReviewLimit: number
   maxAttempts: number
   taskTimeoutMs: number
+  authorSlug: string
+  instanceId: string
+}
+
+export function buildBranchName(input: {
+  authorSlug: string
+  instanceId: string
+  taskId: number
+}): string {
+  return `kaban/${input.authorSlug}/${input.instanceId}/task-${input.taskId}`
 }
 
 interface ActiveRun {
@@ -228,16 +238,22 @@ export class Orchestrator implements OrchestratorSlotHooks {
 
       if (!task.worktreePath) {
         await this.deps.git.fetchRepository(repo.localPath)
+        const branch = buildBranchName({
+          authorSlug: this.deps.config.authorSlug,
+          instanceId: this.deps.config.instanceId,
+          taskId,
+        })
         const path = await this.deps.git.createWorktree({
           localPath: repo.localPath,
           defaultBranch: repo.defaultBranch,
           taskId,
+          branch,
         })
         this.deps.db
           .update(tasks)
           .set({
             worktreePath: path,
-            branchName: `kaban/task-${taskId}`,
+            branchName: branch,
             updatedAt: Date.now(),
           })
           .where(eq(tasks.id, taskId))

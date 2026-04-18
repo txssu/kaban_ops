@@ -20,11 +20,13 @@ export interface GitClient {
     localPath: string
     defaultBranch: string
     taskId: number
+    branch: string
   }): Promise<string>
 
   removeWorktree(input: {
     localPath: string
     taskId: number
+    branch: string
   }): Promise<void>
 }
 
@@ -53,24 +55,24 @@ export class BunGitClient implements GitClient {
     localPath: string
     defaultBranch: string
     taskId: number
+    branch: string
   }): Promise<string> {
     mkdirSync(this.worktreesDir, { recursive: true })
     const path = join(this.worktreesDir, `task-${input.taskId}`)
-    const branch = `kaban/task-${input.taskId}`
-    await $`git -C ${input.localPath} worktree add ${path} -b ${branch} origin/${input.defaultBranch}`.quiet()
+    await $`git -C ${input.localPath} worktree add ${path} -b ${input.branch} origin/${input.defaultBranch}`.quiet()
     return path
   }
 
   async removeWorktree(input: {
     localPath: string
     taskId: number
+    branch: string
   }): Promise<void> {
     const path = join(this.worktreesDir, `task-${input.taskId}`)
-    const branch = `kaban/task-${input.taskId}`
     await $`git -C ${input.localPath} worktree remove ${path} --force`
       .quiet()
       .nothrow()
-    await $`git -C ${input.localPath} branch -D ${branch}`
+    await $`git -C ${input.localPath} branch -D ${input.branch}`
       .quiet()
       .nothrow()
   }

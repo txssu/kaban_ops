@@ -2,12 +2,19 @@ import { Database } from 'bun:sqlite'
 import { drizzle, BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { randomBytes } from 'node:crypto'
+import { eq } from 'drizzle-orm'
 import * as schema from './schema'
 import { paths } from '../shared/paths'
 
 export type Db = BunSQLiteDatabase<typeof schema>
 
 const SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS meta (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS repositories (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL UNIQUE,
@@ -71,6 +78,29 @@ CREATE INDEX IF NOT EXISTS approvals_by_task_status ON approvals(task_id, status
 export function applySchema(sqlite: Database): void {
   sqlite.exec('PRAGMA foreign_keys = ON;')
   sqlite.exec(SCHEMA_SQL)
+  ensureInstanceId(sqlite)
+}
+
+function ensureInstanceId(sqlite: Database): void {
+  const row = sqlite
+    .query("SELECT value FROM meta WHERE key = 'instance_id'")
+    .get() as { value: string } | null
+  if (row) return
+  const id = randomBytes(4).toString('hex')
+  sqlite
+    .prepare("INSERT INTO meta (key, value) VALUES ('instance_id', ?)")
+    .run(id)
+}
+
+export function getInstanceId(db: Db): string {
+  const rows = db
+    .select()
+    .from(schema.meta)
+    .where(eq(schema.meta.key, 'instance_id'))
+    .all()
+  const row = rows[0]
+  if (!row) throw new Error('instance_id missing — DB not initialized')
+  return row.value
 }
 
 export function createDb(file: string = paths.dbFile): Db {

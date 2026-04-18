@@ -1,5 +1,5 @@
 import index from './index.html'
-import { createDb } from './db/client'
+import { createDb, getInstanceId } from './db/client'
 import { createApp } from './server/app'
 import { SseBus } from './server/sse-bus'
 import { BunGitClient } from './orchestrator/git-client'
@@ -14,7 +14,9 @@ import { paths } from './shared/paths'
 const db = createDb()
 const bus = new SseBus()
 const git = new BunGitClient(paths.reposDir, paths.worktreesDir)
-const config = loadConfig(paths.configFile)
+const fileConfig = loadConfig(paths.configFile)
+const instanceId = getInstanceId(db)
+const config = { ...fileConfig, instanceId }
 
 const judge = new ClaudeJudge({
   queryFn: sdkQuery as any,

@@ -10,6 +10,7 @@ import type { GitClient } from './git-client'
 class StubGitClient implements GitClient {
   createCalls: number[] = []
   removeCalls: number[] = []
+  lastBranch: string | null = null
 
   async cloneRepository() {
     return {
@@ -23,11 +24,17 @@ class StubGitClient implements GitClient {
     localPath: string
     defaultBranch: string
     taskId: number
+    branch: string
   }) {
     this.createCalls.push(input.taskId)
+    this.lastBranch = input.branch
     return `/tmp/wt/task-${input.taskId}`
   }
-  async removeWorktree(input: { localPath: string; taskId: number }) {
+  async removeWorktree(input: {
+    localPath: string
+    taskId: number
+    branch: string
+  }) {
     this.removeCalls.push(input.taskId)
   }
 }
@@ -85,6 +92,8 @@ function makeOrchestrator(opts: {
       aiReviewLimit: 1,
       maxAttempts: 3,
       taskTimeoutMs: 1_000_000,
+      authorSlug: 'alice',
+      instanceId: 'testinst',
     },
   })
 }
@@ -110,6 +119,24 @@ test('tick() moves a TODO task to PROGRESS and runs the executor', async () => {
   expect(allRuns).toHaveLength(1)
   expect(allRuns[0]?.status).toBe('succeeded')
   expect(allRuns[0]?.summary).toBe('all done')
+})
+
+test('tick() stores a namespaced branch name on the task', async () => {
+  const db = makeDb()
+  const repo = seedRepo(db)
+  insertTask(db, repo.id, { title: 'first', position: 0 })
+
+  const runner = new FakeAIRunner()
+  runner.queueExecutor({ summary: 'done' })
+  const git = new StubGitClient()
+
+  const orch = makeOrchestrator({ db, runner, git })
+  await orch.tick()
+  await orch.drain()
+
+  const [t] = db.select().from(tasks).all()
+  expect(git.lastBranch).toBe(`kaban/alice/testinst/task-${t!.id}`)
+  expect(t!.branchName).toBe(`kaban/alice/testinst/task-${t!.id}`)
 })
 
 test('tick() honours progressLimit and does not pull a second task', async () => {

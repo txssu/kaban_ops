@@ -1,4 +1,5 @@
 import { readFileSync, existsSync } from 'node:fs'
+import { userInfo } from 'node:os'
 
 export interface Config {
   progressLimit: number
@@ -8,6 +9,20 @@ export interface Config {
   judgeMode: 'advisory' | 'enforcing'
   judgeModel: string
   judgeTimeoutMs: number
+  authorSlug: string
+}
+
+function slugify(raw: string): string {
+  const cleaned = raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  return cleaned || 'kaban'
+}
+
+function detectAuthorSlug(): string {
+  try {
+    return slugify(userInfo().username)
+  } catch {
+    return 'kaban'
+  }
 }
 
 export const defaultConfig: Config = {
@@ -18,11 +33,16 @@ export const defaultConfig: Config = {
   judgeMode: 'advisory',
   judgeModel: 'claude-haiku-4-5-20251001',
   judgeTimeoutMs: 30_000,
+  authorSlug: detectAuthorSlug(),
 }
 
 export function loadConfig(file: string): Config {
   if (!existsSync(file)) return { ...defaultConfig }
   const raw = readFileSync(file, 'utf8')
   const parsed = JSON.parse(raw) as Partial<Config>
-  return { ...defaultConfig, ...parsed }
+  const merged = { ...defaultConfig, ...parsed }
+  if (parsed.authorSlug !== undefined) {
+    merged.authorSlug = slugify(parsed.authorSlug)
+  }
+  return merged
 }
