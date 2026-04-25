@@ -1,5 +1,8 @@
 # Kaban Ops
 
+> ⚠️ **Heads up:** this repo is currently unusable. 🚧 The authors may break
+> everything at any time — pin a commit at your own risk. 💥
+
 A local AI orchestrator that looks like a kanban board. You write coding
 tasks into columns. An agent picks them up, makes the changes inside an
 isolated git worktree, pushes to your remote, and a second agent reviews
